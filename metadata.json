@@ -1,0 +1,7 @@
+{
+  "name": "Tizl — Book a Cook in 10 Minutes",
+  "description": "Book a verified home cook in as little as 10 minutes. Tizl connects households with trusted cooks for breakfast, lunch, dinner, parties, and weekly meal services.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
