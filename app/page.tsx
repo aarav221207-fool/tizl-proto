@@ -1,6 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/auth-context';
 
 const NEEDS = [
   { id: 'breakfast', ic: '🍳', lb: 'Breakfast' },
@@ -84,6 +87,10 @@ const LOGO_SVG = (
 export default function HomePage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
+  // Auth State
+  const router = useRouter();
+  const { user, isAuthenticated, logout } = useAuth();
+
   // Booking Modal State
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [bStep, setBStep] = useState(1);
@@ -106,54 +113,70 @@ export default function HomePage() {
     headcount: 2,
   });
 
-  // Partner Modal State
-  const [isPartnerOpen, setIsPartnerOpen] = useState(false);
-  const [pStep, setPStep] = useState(1);
-  const [partner, setPartner] = useState<{
-    name: string;
-    phone: string;
-    city: string | null;
-    spec: string | null;
-    partnerId?: string;
-  }>({
-    name: '',
-    phone: '',
-    city: null,
-    spec: null,
-  });
-
   const servicesScrollRef = useRef<HTMLDivElement>(null);
 
-  const openBookingModal = (needId?: string) => {
+  const openBookingModal = useCallback((needId?: string) => {
+    if (!isAuthenticated) {
+      router.push(`/customer/login?redirect=${encodeURIComponent(needId ? `/?book=true&need=${needId}` : '/?book=true')}`);
+      return;
+    }
+
     setBooking({
       need: needId || null,
-      date: '',
-      time: '09:00',
-      duration: null,
-      city: null,
+      date: new Date().toISOString().slice(0, 10),
+      time: '12:30',
+      duration: '2',
+      city: 'Delhi NCR',
       cook: null,
       headcount: 2,
     });
     setBStep(1);
     setIsBookingOpen(true);
-  };
+  }, [isAuthenticated, router]);
 
-  const openPartnerModal = () => {
-    setPartner({
-      name: '',
-      phone: '',
-      city: null,
-      spec: null,
-    });
-    setPStep(1);
-    setIsPartnerOpen(true);
-  };
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('book') === 'true' && isAuthenticated) {
+        const need = urlParams.get('need') || undefined;
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        const timer = setTimeout(() => {
+          openBookingModal(need);
+        }, 0);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isAuthenticated, openBookingModal]);
 
-  const handleBookingNext = () => {
+  const handleBookingNext = async () => {
     if (bStep < 4) {
       if (bStep === 3) {
-        const id = 'TIZL-' + Math.random().toString(36).slice(2, 8).toUpperCase();
-        setBooking(prev => ({ ...prev, bookingId: id }));
+        const fallbackId = 'TIZL-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+        setBooking(prev => ({ ...prev, bookingId: fallbackId }));
+        
+        // Asynchronously persist real booking into Supabase if authenticated
+        try {
+          const res = await fetch('/api/bookings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              service_id: booking.need || 'lunch',
+              address_id: 'default',
+              booking_date: booking.date || new Date().toISOString().slice(0, 10),
+              start_time: booking.time || '12:30',
+              duration_hours: parseInt(booking.duration || '2') || 2,
+              guest_count: booking.headcount || 2,
+              cooking_notes: `Preferred Cook: ${booking.cook || 'Any Verified Cook'}. City: ${booking.city || 'Delhi NCR'}.`,
+            }),
+          });
+          const data = await res.json();
+          if (data.success && data.data?.booking?.booking_number) {
+            setBooking(prev => ({ ...prev, bookingId: data.data.booking.booking_number }));
+          }
+        } catch (e) {
+          console.error('Error recording booking to database:', e);
+        }
       }
       setBStep(prev => prev + 1);
     }
@@ -165,32 +188,11 @@ export default function HomePage() {
     }
   };
 
-  const handlePartnerNext = () => {
-    if (pStep < 3) {
-      if (pStep === 2) {
-        const id = 'TIZL-COOK-' + Math.random().toString(36).slice(2, 7).toUpperCase();
-        setPartner(prev => ({ ...prev, partnerId: id }));
-      }
-      setPStep(prev => prev + 1);
-    }
-  };
-
-  const handlePartnerBack = () => {
-    if (pStep > 1) {
-      setPStep(prev => prev - 1);
-    }
-  };
-
   const isBNextEnabled = () => {
+
     if (bStep === 1) return !!booking.need;
     if (bStep === 2) return !!(booking.date && booking.time && booking.duration && booking.city);
     if (bStep === 3) return !!booking.cook;
-    return true;
-  };
-
-  const isPNextEnabled = () => {
-    if (pStep === 1) return !!(partner.name && partner.phone && partner.city);
-    if (pStep === 2) return !!partner.spec;
     return true;
   };
 
@@ -232,8 +234,37 @@ export default function HomePage() {
             <div className="nav-item"><a href="#faqs">FAQs</a></div>
           </nav>
           <div className="header-ctas">
-            <button type="button" className="btn btn-ghost btn-small" onClick={openPartnerModal}>Become a partner</button>
-            <button type="button" className="btn btn-primary btn-small" onClick={() => openBookingModal()}>Book a cook</button>
+            {!isAuthenticated && (
+              <>
+                <Link href="/customer/login" className="btn btn-ghost btn-small font-semibold">Login</Link>
+                <Link href="/customer/signup" className="btn btn-ghost btn-small font-semibold">Sign Up</Link>
+              </>
+            )}
+            
+            {isAuthenticated && user?.role === 'customer' && (
+              <>
+                <div className="header-user">
+                  <div className="av">{(user.fullName || user.email || 'U').charAt(0).toUpperCase()}</div>
+                  <span className="hidden md:inline font-medium text-[var(--ink)]">
+                    Hello, {user.fullName?.split(' ')[0] || user.email?.split('@')[0]}
+                  </span>
+                </div>
+                <Link href="/customer/dashboard" className="btn btn-ghost btn-small font-semibold hidden sm:inline-flex">My Bookings</Link>
+                <button onClick={() => logout()} className="btn btn-ghost btn-small font-semibold">Logout</button>
+              </>
+            )}
+
+            {isAuthenticated && user?.role === 'cook' && (
+              <>
+                <Link href="/partner/dashboard" className="btn btn-ghost btn-small font-semibold">Partner Dashboard</Link>
+                <Link href="/partner/verification" className="btn btn-ghost btn-small font-semibold hidden sm:inline-flex">Verification Status</Link>
+                <button onClick={() => logout()} className="btn btn-ghost btn-small font-semibold">Logout</button>
+              </>
+            )}
+
+            {(!isAuthenticated || user?.role === 'customer') && (
+              <button type="button" className="btn btn-primary btn-small" onClick={() => openBookingModal()}>Book a cook</button>
+            )}
           </div>
         </div>
       </header>
@@ -247,7 +278,7 @@ export default function HomePage() {
               <p className="lead">Not a subscription. Not a chef for special occasions. Tizl gets a trained, verified cook into your kitchen — sizzling — on any random Tuesday. Breakfast, lunch, dinner, or a full party spread, priced by the hour.</p>
               <div className="hero-ctas">
                 <button type="button" className="btn btn-primary" onClick={() => openBookingModal()}>Book a cook now</button>
-                <button type="button" className="btn btn-ghost" onClick={openPartnerModal}>Become a partner cook</button>
+                <a href="#how-it-works" className="btn btn-ghost">How it works</a>
               </div>
               <div className="store-badges">
                 <div className="store-badge"><span className="ic">▶</span><div className="txt"><small>GET IT ON</small><strong>Google Play</strong></div><span className="soon">Coming soon</span></div>
@@ -288,7 +319,15 @@ export default function HomePage() {
       </section>
 
       <div className="trust-strip">
-        <div className="wrap">
+        <div className="marquee-track">
+          <div className="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg>Aadhaar-verified cooks</div>
+          <div className="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>Police-background checked</div>
+          <div className="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 17.3l-6.2 3.3 1.2-6.9L2 8.9l7-1L12 1.5 15 7.9l7 1-5 4.8 1.2 6.9z"/></svg>No advance payment</div>
+          <div className="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>Cook arrives in your slot</div>
+          <div className="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg>Aadhaar-verified cooks</div>
+          <div className="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>Police-background checked</div>
+          <div className="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 17.3l-6.2 3.3 1.2-6.9L2 8.9l7-1L12 1.5 15 7.9l7 1-5 4.8 1.2 6.9z"/></svg>No advance payment</div>
+          <div className="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>Cook arrives in your slot</div>
           <div className="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg>Aadhaar-verified cooks</div>
           <div className="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>Police-background checked</div>
           <div className="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 17.3l-6.2 3.3 1.2-6.9L2 8.9l7-1L12 1.5 15 7.9l7 1-5 4.8 1.2 6.9z"/></svg>No advance payment</div>
@@ -484,7 +523,7 @@ export default function HomePage() {
               </div>
               <div className="footer-col">
                 <h4>Company</h4>
-                <a href="#" onClick={(e) => { e.preventDefault(); openPartnerModal(); }}>Become a Tizl cook</a>
+                <a href="#why-us">Why Tizl</a>
                 <a href="#cities">Request Tizl in your locality</a>
               </div>
               <div className="footer-col">
@@ -678,124 +717,6 @@ export default function HomePage() {
               </button>
             ) : (
               <button type="button" className="btn btn-primary btn-small" onClick={() => setIsBookingOpen(false)}>Done</button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* PARTNER MODAL */}
-      <div className={`modal-overlay ${isPartnerOpen ? 'open' : ''}`}>
-        <div className="modal">
-          <div className="modal-head">
-            <h3>Register as a cook</h3>
-            <button type="button" className="modal-close" onClick={() => setIsPartnerOpen(false)}>✕</button>
-          </div>
-          <div className="modal-body">
-            <div className="step-track">
-              <span className={pStep >= 1 ? 'active' : ''}></span>
-              <span className={pStep >= 2 ? 'active' : ''}></span>
-              <span className={pStep >= 3 ? 'active' : ''}></span>
-            </div>
-
-            {pStep === 1 && (
-              <div>
-                <div className="field-group">
-                  <label>Full name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Sunita Devi"
-                    value={partner.name}
-                    onChange={(e) => setPartner(prev => ({ ...prev, name: e.target.value }))}
-                  />
-                </div>
-                <div className="field-group">
-                  <label>Phone number</label>
-                  <input
-                    type="tel"
-                    placeholder="10-digit mobile number"
-                    value={partner.phone}
-                    onChange={(e) => setPartner(prev => ({ ...prev, phone: e.target.value }))}
-                  />
-                </div>
-                <div className="field-group">
-                  <label>City</label>
-                  <div className="option-grid">
-                    {CITIES.map(c => (
-                      <button
-                        key={c}
-                        type="button"
-                        className={`option-card ${partner.city === c ? 'selected' : ''}`}
-                        style={{ padding: '12px 14px' }}
-                        onClick={() => setPartner(prev => ({ ...prev, city: c }))}
-                      >
-                        <div className="lb">{c}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {pStep === 2 && (
-              <div>
-                <div className="field-group">
-                  <label>Upload Aadhaar (front)</label>
-                  <input type="file" />
-                </div>
-                <div className="field-group">
-                  <label>Cooking speciality</label>
-                  <div className="option-grid">
-                    {['North Indian', 'South Indian', 'Baking & desserts', 'Baby & senior diets', 'Party & catering', 'Healthy / diet meals'].map(s => (
-                      <button
-                        key={s}
-                        type="button"
-                        className={`option-card ${partner.spec === s ? 'selected' : ''}`}
-                        style={{ padding: '12px 14px' }}
-                        onClick={() => setPartner(prev => ({ ...prev, spec: s }))}
-                      >
-                        <div className="lb">{s}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <p style={{ fontSize: '13px', color: 'var(--text-dim)', lineHeight: '1.6' }}>
-                  Your details go through Aadhaar verification and a police background check before you can accept bookings — usually 2–3 business days.
-                </p>
-              </div>
-            )}
-
-            {pStep === 3 && (
-              <div>
-                <div className="success-box">
-                  <div className="success-icon">✓</div>
-                  <h3>Application received</h3>
-                  <p>
-                    Thanks, {partner.name.split(' ')[0] || 'there'}. We&apos;re verifying your Aadhaar and running a police background check for {partner.city}. This usually takes 2–3 business days — we&apos;ll message you on {partner.phone || 'your phone'} once you&apos;re approved.
-                  </p>
-                  <span className="booking-id">{partner.partnerId}</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="modal-footer">
-            {pStep > 1 && pStep < 3 ? (
-              <button type="button" className="btn btn-ghost btn-small" onClick={handlePartnerBack}>Back</button>
-            ) : (
-              <span></span>
-            )}
-            {pStep < 3 ? (
-              <button
-                type="button"
-                className="btn btn-primary btn-small"
-                disabled={!isPNextEnabled()}
-                style={!isPNextEnabled() ? { opacity: 0.4, cursor: 'not-allowed' } : {}}
-                onClick={handlePartnerNext}
-              >
-                {pStep === 2 ? 'Submit for verification' : 'Continue'}
-              </button>
-            ) : (
-              <button type="button" className="btn btn-primary btn-small" onClick={() => setIsPartnerOpen(false)}>Done</button>
             )}
           </div>
         </div>
