@@ -3,13 +3,8 @@
   publish = ".next"
 
 [context.production]
-  publish = ".next"
   command = "npm run build"
+  publish = ".next"
 
-[context.deploy-preview]
-  publish = ".next"
-  command = "npm run build"
-
-[context.branch-deploy]
-  publish = ".next"
-  command = "npm run build"
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
