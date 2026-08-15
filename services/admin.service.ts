@@ -86,7 +86,7 @@ export class AdminService {
       'APPROVE_COOK',
       cookId,
       null,
-      { is_verified: true, status: 'active' }
+      { is_approved: true, verification_status: 'verified', status: 'active' }
     );
 
     return updatedProfile;
@@ -112,7 +112,7 @@ export class AdminService {
       'REJECT_COOK',
       cookId,
       null,
-      { is_verified: false, status: 'rejected', reason }
+      { is_approved: false, verification_status: 'rejected', status: 'rejected', reason }
     );
 
     return updatedProfile;
@@ -137,7 +137,7 @@ export class AdminService {
       'REQUEST_COOK_DOCUMENTS',
       cookId,
       null,
-      { police_verification_status: 'pending_docs', notes }
+      { verification_status: 'pending_docs', notes }
     );
 
     return { cookId, notes };

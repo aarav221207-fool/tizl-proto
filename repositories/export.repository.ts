@@ -94,24 +94,32 @@ export class ExportRepository extends BaseRepository<'bookings'> {
   async getCooksData(client: SupabaseClient<Database>, filters: ExportFilters) {
     let query = client
       .from('profiles')
-      .select(`
-        id,
-        full_name,
-        email,
-        phone,
-        status,
-        created_at,
-        cook_details(bio, experience_years, speciality, hourly_rate, is_verified, police_verification_status)
-      `)
+      .select('id, full_name, email, phone, status, created_at')
       .eq('role', 'cook')
       .order('created_at', { ascending: false });
 
     if (filters.startDate) query = query.gte('created_at', filters.startDate);
     if (filters.endDate) query = query.lte('created_at', filters.endDate);
 
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
+    const [profilesRes, cooksRes] = await Promise.all([
+      query,
+      client.from('cooks').select('*'),
+    ]);
+
+    if (profilesRes.error) throw profilesRes.error;
+
+    const profiles = profilesRes.data || [];
+    const cooksList = cooksRes.data || [];
+
+    return profiles.map((p) => {
+      const details = cooksList.find(
+        (c) => c.id === p.id || c.profile_id === p.id
+      );
+      return {
+        ...p,
+        cook_details: details || null,
+      };
+    });
   }
 
   /**

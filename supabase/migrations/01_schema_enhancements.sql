@@ -273,16 +273,16 @@ DROP POLICY IF EXISTS "Admins can insert booking cancellations" ON booking_cance
 CREATE POLICY "Admins can insert booking cancellations" ON booking_cancellations
   FOR INSERT WITH CHECK (is_admin(auth.uid()) OR auth.uid() IS NOT NULL);
 
--- Cook Details Policies
-ALTER TABLE cook_details ENABLE ROW LEVEL SECURITY;
+-- Cooks Policies
+ALTER TABLE cooks ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Anyone can view cook details" ON cook_details;
-CREATE POLICY "Anyone can view cook details" ON cook_details
+DROP POLICY IF EXISTS "Anyone can view cooks" ON cooks;
+CREATE POLICY "Anyone can view cooks" ON cooks
   FOR SELECT USING (true);
 
-DROP POLICY IF EXISTS "Cooks or admins can manage cook details" ON cook_details;
-CREATE POLICY "Cooks or admins can manage cook details" ON cook_details
-  FOR ALL USING (cook_id = auth.uid() OR is_admin(auth.uid()));
+DROP POLICY IF EXISTS "Cooks or admins can manage cooks" ON cooks;
+CREATE POLICY "Cooks or admins can manage cooks" ON cooks
+  FOR ALL USING (profile_id = auth.uid() OR is_admin(auth.uid()));
 
 -- Customer Details Policies
 ALTER TABLE customer_details ENABLE ROW LEVEL SECURITY;

@@ -147,24 +147,29 @@ export class ExportService {
 
       if (type === 'cooks') {
         const details = (row.cook_details || {}) as {
+          display_name?: string;
           bio?: string;
           experience_years?: number;
-          speciality?: string[];
           hourly_rate?: number;
-          is_verified?: boolean;
-          police_verification_status?: string;
+          average_rating?: number;
+          total_reviews?: number;
+          verification_status?: string;
+          is_approved?: boolean;
+          is_available?: boolean;
         };
         return {
           'Cook ID': row.id,
-          'Full Name': row.full_name || 'N/A',
+          'Full Name': row.full_name || details.display_name || 'N/A',
           'Email': row.email || 'N/A',
           'Phone': row.phone || 'N/A',
           'Status': row.status,
           'Experience (Years)': details.experience_years || 0,
-          'Specialities': Array.isArray(details.speciality) ? details.speciality.join(', ') : 'General',
           'Hourly Rate (₹)': details.hourly_rate || 0,
-          'Is Verified': details.is_verified ? 'Yes' : 'No',
-          'Police Verification': details.police_verification_status || 'Pending',
+          'Average Rating': details.average_rating ?? 'N/A',
+          'Total Reviews': details.total_reviews ?? 0,
+          'Is Approved': details.is_approved ? 'Yes' : 'No',
+          'Verification Status': details.verification_status || 'Pending',
+          'Is Available': details.is_available ? 'Yes' : 'No',
           'Joined At': row.created_at,
         };
       }

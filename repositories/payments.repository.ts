@@ -92,6 +92,33 @@ export class PaymentsRepository extends BaseRepository<'payments'> {
 
     return data;
   }
+
+  async listAllPaymentsAdmin(client: SupabaseClient<Database>) {
+    const [paymentsRes, bookingsRes, profilesRes] = await Promise.all([
+      client.from('payments').select('*').order('created_at', { ascending: false }),
+      client.from('bookings').select('id, booking_number, booking_date, service_id, total_amount, status, services(name)'),
+      client.from('profiles').select('id, full_name, email, phone, role'),
+    ]);
+
+    if (paymentsRes.error) throw paymentsRes.error;
+
+    const payments = paymentsRes.data || [];
+    const bookings = bookingsRes.data || [];
+    const profiles = profilesRes.data || [];
+
+    const bookingMap = new Map(bookings.map((b) => [b.id, b]));
+    const profileMap = new Map(profiles.map((p) => [p.id, p]));
+
+    return payments.map((p) => {
+      const booking = p.booking_id ? bookingMap.get(p.booking_id) : null;
+      const customer = p.customer_id ? profileMap.get(p.customer_id) : null;
+      return {
+        ...p,
+        booking,
+        customer,
+      };
+    });
+  }
 }
 
 export const paymentsRepository = new PaymentsRepository();

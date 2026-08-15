@@ -43,15 +43,21 @@ interface Cook {
   created_at: string;
   cook_details: {
     id: string;
-    cook_id: string;
+    profile_id: string;
+    display_name?: string;
     bio: string | null;
-    experience_years: number;
-    speciality: string[] | null;
+    experience_years: number | null;
     hourly_rate: number;
-    is_verified: boolean;
-    police_verification_status: string;
-    aadhaar_number: string | null;
-    bank_details: Record<string, any> | null;
+    city_id?: string;
+    average_rating?: number | null;
+    total_reviews?: number | null;
+    verification_status?: string | null;
+    is_approved?: boolean | null;
+    is_available?: boolean | null;
+    is_verified?: boolean;
+    police_verification_status?: string;
+    aadhaar_number?: string | null;
+    bank_details?: Record<string, any> | null;
   } | null;
   stats: {
     totalBookings: number;
@@ -195,18 +201,18 @@ export default function AdminCooksPage() {
         const nameMatch = cook.full_name?.toLowerCase().includes(term);
         const phoneMatch = cook.phone?.toLowerCase().includes(term);
         const emailMatch = cook.email?.toLowerCase().includes(term);
-        const specMatch = cook.cook_details?.speciality?.some((s) => s.toLowerCase().includes(term));
+        const specMatch = cook.cook_details?.display_name?.toLowerCase().includes(term) || cook.cook_details?.bio?.toLowerCase().includes(term);
         if (!nameMatch && !phoneMatch && !emailMatch && !specMatch) return false;
       }
 
       // Verification Status filter
       if (verificationFilter !== 'all') {
-        const isVerified = cook.cook_details?.is_verified;
-        const policeStatus = cook.cook_details?.police_verification_status;
+        const isVerified = Boolean(cook.cook_details?.is_approved || cook.cook_details?.verification_status === 'verified');
+        const vStatus = cook.cook_details?.verification_status;
         if (verificationFilter === 'verified' && !isVerified) return false;
         if (verificationFilter === 'pending' && isVerified) return false;
-        if (verificationFilter === 'pending_docs' && policeStatus !== 'pending_docs') return false;
-        if (verificationFilter === 'rejected' && policeStatus !== 'rejected') return false;
+        if (verificationFilter === 'pending_docs' && vStatus !== 'pending_docs') return false;
+        if (verificationFilter === 'rejected' && vStatus !== 'rejected') return false;
       }
 
       // Status filter
@@ -310,8 +316,8 @@ export default function AdminCooksPage() {
 
   // Metrics summary
   const totalCount = cooks.length;
-  const verifiedCount = cooks.filter((c) => c.cook_details?.is_verified).length;
-  const pendingCount = cooks.filter((c) => !c.cook_details?.is_verified && c.status !== 'rejected').length;
+  const verifiedCount = cooks.filter((c) => c.cook_details?.is_approved || c.cook_details?.verification_status === 'verified').length;
+  const pendingCount = cooks.filter((c) => !(c.cook_details?.is_approved || c.cook_details?.verification_status === 'verified') && c.status !== 'rejected').length;
   const suspendedCount = cooks.filter((c) => c.status === 'suspended').length;
   const avgRate = cooks.length > 0
     ? Math.round(cooks.reduce((sum, c) => sum + (c.cook_details?.hourly_rate || 0), 0) / cooks.length)
@@ -544,7 +550,7 @@ export default function AdminCooksPage() {
               <tbody className="divide-y divide-slate-800/80">
                 {filteredCooks.map((cook) => {
                   const details = cook.cook_details;
-                  const isVerified = details?.is_verified;
+                  const isVerified = Boolean(details?.is_approved || details?.verification_status === 'verified');
                   const isSelected = selectedCookIds.includes(cook.id);
 
                   return (
@@ -605,12 +611,12 @@ export default function AdminCooksPage() {
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             Verified
                           </span>
-                        ) : details?.police_verification_status === 'pending_docs' ? (
+                        ) : details?.verification_status === 'pending_docs' ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full">
                             <Clock className="w-3.5 h-3.5" />
                             Docs Requested
                           </span>
-                        ) : details?.police_verification_status === 'rejected' ? (
+                        ) : details?.verification_status === 'rejected' ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-full">
                             <XCircle className="w-3.5 h-3.5" />
                             Rejected
@@ -628,19 +634,8 @@ export default function AdminCooksPage() {
                         <div className="text-xs text-slate-200 font-medium">
                           {details?.experience_years ? `${details.experience_years} Years Exp.` : 'Fresher'}
                         </div>
-                        <div className="flex flex-wrap gap-1 mt-1 max-w-xs">
-                          {details?.speciality && details.speciality.length > 0 ? (
-                            details.speciality.slice(0, 3).map((spec, idx) => (
-                              <span
-                                key={idx}
-                                className="px-1.5 py-0.5 text-[10px] bg-slate-800 text-slate-300 rounded border border-slate-700/60"
-                              >
-                                {spec}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-[11px] text-slate-500">General Cooking</span>
-                          )}
+                        <div className="text-xs text-slate-400 mt-1 max-w-xs truncate">
+                          {details?.display_name || details?.bio || 'General Cooking'}
                         </div>
                       </td>
 
@@ -708,7 +703,7 @@ export default function AdminCooksPage() {
                 <div>
                   <h2 className="text-lg font-bold text-white flex items-center gap-2">
                     <span>{cookProfile?.profile?.full_name || 'Cook Verification Details'}</span>
-                    {cookProfile?.details?.is_verified && (
+                    {(cookProfile?.details?.is_approved || cookProfile?.details?.verification_status === 'verified') && (
                       <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                     )}
                   </h2>
@@ -769,7 +764,7 @@ export default function AdminCooksPage() {
                         <div>
                           <div className="text-xs text-slate-400 font-medium">Current Status</div>
                           <div className="flex items-center gap-2 mt-1">
-                            {cookProfile.details?.is_verified ? (
+                            {(cookProfile.details?.is_approved || cookProfile.details?.verification_status === 'verified') ? (
                               <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full">
                                 VERIFIED COOK
                               </span>
@@ -785,7 +780,7 @@ export default function AdminCooksPage() {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2">
-                          {!cookProfile.details?.is_verified && (
+                          {!(cookProfile.details?.is_approved || cookProfile.details?.verification_status === 'verified') && (
                             <button
                               onClick={() =>
                                 setActionModal({
@@ -925,9 +920,9 @@ export default function AdminCooksPage() {
                               <span className="font-mono font-semibold text-emerald-400">₹{cookProfile.details?.hourly_rate || 0}/hr</span>
                             </div>
                             <div className="flex justify-between text-slate-300">
-                              <span className="text-slate-500">Specialties:</span>
+                              <span className="text-slate-500">Display Name:</span>
                               <span className="text-right">
-                                {cookProfile.details?.speciality?.join(', ') || 'General'}
+                                {cookProfile.details?.display_name || 'General'}
                               </span>
                             </div>
                           </div>
@@ -982,7 +977,7 @@ export default function AdminCooksPage() {
                               Police Verification
                             </span>
                             <span className="text-[10px] uppercase font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
-                              {cookProfile.details?.police_verification_status || 'Pending'}
+                              {cookProfile.details?.verification_status || 'Pending'}
                             </span>
                           </div>
                           <p className="text-xs text-slate-400">

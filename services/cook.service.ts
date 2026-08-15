@@ -29,7 +29,7 @@ export class CookService {
   async registerCook(
     client: SupabaseClient<Database>,
     cookId: string,
-    details: Omit<Database['public']['Tables']['cook_details']['Insert'], 'cook_id'>
+    details: Partial<Database['public']['Tables']['cooks']['Insert']>
   ) {
     // 1. Ensure user role is 'cook'
     await customersRepository.updateProfile(client, cookId, {
@@ -39,10 +39,13 @@ export class CookService {
 
     // 2. Register cook details
     const createdDetails = await cooksRepository.registerCookDetails(client, {
-      cook_id: cookId,
+      profile_id: cookId,
+      display_name: details.display_name || 'Cook',
+      hourly_rate: details.hourly_rate || 150,
+      city_id: details.city_id || '',
       ...details,
-      is_verified: false,
-      police_verification_status: 'pending',
+      is_approved: false,
+      verification_status: 'pending',
       updated_at: new Date().toISOString(),
     });
 
@@ -58,9 +61,9 @@ export class CookService {
     updates: {
       full_name?: string;
       phone?: string;
+      display_name?: string;
       bio?: string;
       experience_years?: number;
-      speciality?: string[];
       hourly_rate?: number;
     }
   ) {
@@ -76,7 +79,10 @@ export class CookService {
 
     if (Object.keys(cookUpdates).length > 0) {
       await cooksRepository.registerCookDetails(client, {
-        cook_id: cookId,
+        profile_id: cookId,
+        display_name: cookUpdates.display_name || full_name || 'Cook',
+        hourly_rate: cookUpdates.hourly_rate || 150,
+        city_id: '',
         ...cookUpdates,
         updated_at: new Date().toISOString(),
       });
@@ -159,9 +165,9 @@ export class CookService {
       throw new BadRequestError('This booking is already assigned to another cook');
     }
 
-    // Ensure cook is verified
+    // Ensure cook is verified / approved
     const details = await cooksRepository.getCookDetails(client, cookId);
-    if (!details || !details.is_verified) {
+    if (!details || (!details.is_approved && details.verification_status !== 'verified')) {
       throw new ForbiddenError('Only verified cooks can accept bookings');
     }
 
@@ -277,7 +283,7 @@ export class CookService {
   }
 
   /**
-   * Upload verification documents (Aadhaar number, bank details)
+   * Upload verification documents (triggers pending verification status)
    */
   async uploadVerificationDocuments(
     client: SupabaseClient<Database>,
@@ -287,12 +293,12 @@ export class CookService {
       bank_details?: Record<string, unknown>;
     }
   ) {
-    return cooksRepository.registerCookDetails(client, {
-      cook_id: cookId,
-      ...documents,
-      police_verification_status: 'pending',
-      updated_at: new Date().toISOString(),
-    });
+    return cooksRepository.updateVerificationStatus(
+      client,
+      cookId,
+      false,
+      'pending'
+    );
   }
 
   /**

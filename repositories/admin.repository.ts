@@ -64,15 +64,15 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
     adminProfileId: string
   ) {
     const updated = await client
-      .from('cook_details')
+      .from('cooks')
       .update({
-        is_verified: true,
-        police_verification_status: 'verified',
+        is_approved: true,
+        verification_status: 'verified',
         updated_at: new Date().toISOString(),
       })
-      .eq('cook_id', cookId)
+      .or(`id.eq.${cookId},profile_id.eq.${cookId}`)
       .select()
-      .single();
+      .maybeSingle();
 
     if (updated.error) throw updated.error;
 
@@ -82,7 +82,7 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
       'APPROVE_COOK_VERIFICATION',
       cookId,
       null,
-      { is_verified: true }
+      { is_approved: true, verification_status: 'verified' }
     );
 
     return updated.data;
@@ -110,7 +110,7 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
     const [
       bookingsRes,
       cooksProfilesRes,
-      cookDetailsRes,
+      cooksRes,
       customersRes,
       servicesRes,
       citiesRes,
@@ -118,7 +118,7 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
     ] = await Promise.all([
       client.from('bookings').select('*'),
       client.from('profiles').select('*').eq('role', 'cook'),
-      client.from('cook_details').select('*'),
+      client.from('cooks').select('*'),
       client.from('profiles').select('*').eq('role', 'customer'),
       client.from('services').select('*'),
       client.from('cities').select('*'),
@@ -141,12 +141,12 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
         hint: cooksProfilesRes.error.hint,
       });
     }
-    if (cookDetailsRes.error) {
-      console.error('[Dashboard Metrics] Error querying "cook_details":', {
-        code: cookDetailsRes.error.code,
-        message: cookDetailsRes.error.message,
-        details: cookDetailsRes.error.details,
-        hint: cookDetailsRes.error.hint,
+    if (cooksRes.error) {
+      console.error('[Dashboard Metrics] Error querying "cooks":', {
+        code: cooksRes.error.code,
+        message: cooksRes.error.message,
+        details: cooksRes.error.details,
+        hint: cooksRes.error.hint,
       });
     }
     if (customersRes.error) {
@@ -185,7 +185,7 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
     const errors = [
       bookingsRes.error ? `bookings: ${bookingsRes.error.message}` : null,
       cooksProfilesRes.error ? `cook profiles: ${cooksProfilesRes.error.message}` : null,
-      cookDetailsRes.error ? `cook_details: ${cookDetailsRes.error.message}` : null,
+      cooksRes.error ? `cooks: ${cooksRes.error.message}` : null,
       customersRes.error ? `customer profiles: ${customersRes.error.message}` : null,
       servicesRes.error ? `services: ${servicesRes.error.message}` : null,
       citiesRes.error ? `cities: ${citiesRes.error.message}` : null,
@@ -198,11 +198,13 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
 
     const bookings = bookingsRes.data || [];
     const cooksProfiles = cooksProfilesRes.data || [];
-    const cookDetailsList = cookDetailsRes.data || [];
+    const cooksList = cooksRes.data || [];
 
-    // In-memory join for cooks and cook_details
+    // In-memory join for cooks and cook profiles
     const cooks = cooksProfiles.map((profile) => {
-      const details = cookDetailsList.filter((d) => d.cook_id === profile.id);
+      const details = cooksList.filter(
+        (d) => d.id === profile.id || d.profile_id === profile.id
+      );
       return {
         ...profile,
         cook_details: details.length > 0 ? details[0] : null,
@@ -224,11 +226,11 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
     // Cooks metrics
     const activeCooks = cooks.filter((c) => {
       const details = Array.isArray(c.cook_details) ? c.cook_details[0] : c.cook_details;
-      const isVerified =
-        typeof details === 'object' && details !== null && 'is_verified' in details
-          ? (details as { is_verified: boolean }).is_verified
+      const isApproved =
+        typeof details === 'object' && details !== null && 'is_approved' in details
+          ? (details as { is_approved: boolean | null }).is_approved
           : false;
-      return isVerified || c.status === 'active';
+      return isApproved || c.status === 'active';
     }).length;
     const onlineCooks = cooks.filter(
       (c) => c.status === 'active' || c.status === 'online'

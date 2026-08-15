@@ -92,7 +92,10 @@ interface CookOption {
   id: string;
   full_name: string | null;
   phone: string | null;
-  cook_details?: { is_verified?: boolean }[] | { is_verified?: boolean };
+  cook_details?:
+    | { is_approved?: boolean | null; verification_status?: string | null; is_verified?: boolean }[]
+    | { is_approved?: boolean | null; verification_status?: string | null; is_verified?: boolean }
+    | null;
 }
 
 export default function AdminBookingsPage() {

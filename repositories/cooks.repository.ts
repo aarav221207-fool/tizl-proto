@@ -2,17 +2,17 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
 import { BaseRepository } from './base.repository';
 
-export class CooksRepository extends BaseRepository<'cook_details'> {
+export class CooksRepository extends BaseRepository<'cooks'> {
   constructor() {
-    super('cook_details');
+    super('cooks');
   }
 
   async getCookDetails(client: SupabaseClient<Database>, cookId: string) {
     const { data, error } = await client
-      .from('cook_details')
-      .select('*, profiles!inner(full_name, phone, avatar_url, status)')
-      .eq('cook_id', cookId)
-      .single();
+      .from('cooks')
+      .select('*')
+      .or(`id.eq.${cookId},profile_id.eq.${cookId}`)
+      .maybeSingle();
 
     if (error) return null;
     return data;
@@ -20,10 +20,9 @@ export class CooksRepository extends BaseRepository<'cook_details'> {
 
   async listVerifiedCooks(client: SupabaseClient<Database>, limit = 20) {
     const { data, error } = await client
-      .from('cook_details')
-      .select('*, profiles!inner(id, full_name, avatar_url, status)')
-      .eq('is_verified', true)
-      .eq('police_verification_status', 'verified')
+      .from('cooks')
+      .select('*')
+      .eq('is_approved', true)
       .limit(limit);
 
     if (error) throw error;
@@ -31,13 +30,13 @@ export class CooksRepository extends BaseRepository<'cook_details'> {
   }
 
   async listAllCooksAdmin(client: SupabaseClient<Database>) {
-    const [profilesRes, detailsRes, bookingsRes, reviewsRes] = await Promise.all([
+    const [profilesRes, cooksRes, bookingsRes, reviewsRes] = await Promise.all([
       client
         .from('profiles')
         .select('*')
         .eq('role', 'cook')
         .order('created_at', { ascending: false }),
-      client.from('cook_details').select('*'),
+      client.from('cooks').select('*'),
       client.from('bookings').select('cook_id, status, total_amount'),
       client.from('reviews').select('cook_id, rating'),
     ]);
@@ -45,7 +44,7 @@ export class CooksRepository extends BaseRepository<'cook_details'> {
     if (profilesRes.error) throw profilesRes.error;
 
     const profiles = profilesRes.data || [];
-    const detailsList = detailsRes.data || [];
+    const cooksList = cooksRes.data || [];
     const bookings = bookingsRes.data || [];
     const reviews = reviewsRes.data || [];
 
@@ -89,7 +88,9 @@ export class CooksRepository extends BaseRepository<'cook_details'> {
       const rating = cookRatingMap.get(p.id);
       const avgRating = rating && rating.totalRatings > 0 ? rating.sumRatings / rating.totalRatings : 0;
       
-      const detailsArr = detailsList.filter(d => d.cook_id === p.id);
+      const detailsArr = cooksList.filter(
+        (c) => c.id === p.id || c.profile_id === p.id
+      );
       const details = detailsArr.length > 0 ? detailsArr[0] : null;
 
       return {
@@ -107,9 +108,9 @@ export class CooksRepository extends BaseRepository<'cook_details'> {
   }
 
   async getCookFullProfileAdmin(client: SupabaseClient<Database>, cookId: string) {
-    const [profileRes, detailsRes, bookingsRes, reviewsRes, auditRes] = await Promise.all([
+    const [profileRes, cooksRes, bookingsRes, reviewsRes, auditRes, docsRes, availRes] = await Promise.all([
       client.from('profiles').select('*').eq('id', cookId).single(),
-      client.from('cook_details').select('*').eq('cook_id', cookId).maybeSingle(),
+      client.from('cooks').select('*').or(`id.eq.${cookId},profile_id.eq.${cookId}`).maybeSingle(),
       client
         .from('bookings')
         .select('*, service:services(name, category), customer:profiles!customer_id(full_name, phone)')
@@ -125,15 +126,19 @@ export class CooksRepository extends BaseRepository<'cook_details'> {
         .select('*')
         .eq('record_id', cookId)
         .order('created_at', { ascending: false }),
+      client.from('cook_documents').select('*').eq('cook_id', cookId),
+      client.from('cook_availability').select('*').eq('cook_id', cookId),
     ]);
 
     if (profileRes.error) throw profileRes.error;
 
     const profile = profileRes.data;
-    const details = detailsRes.data || null;
+    const details = cooksRes.data || null;
     const bookings = bookingsRes.data || [];
     const reviews = reviewsRes.data || [];
     const auditLogs = auditRes.data || [];
+    const documents = docsRes.data || [];
+    const availability = availRes.data || [];
 
     const completedBookings = bookings.filter((b) => ['completed', 'paid'].includes(b.status));
     const totalEarnings = completedBookings.reduce((sum, b) => sum + (b.total_amount || 0), 0);
@@ -145,6 +150,8 @@ export class CooksRepository extends BaseRepository<'cook_details'> {
     return {
       profile,
       details,
+      documents,
+      availability,
       bookings,
       reviews,
       auditLogs,
@@ -161,19 +168,19 @@ export class CooksRepository extends BaseRepository<'cook_details'> {
   async updateVerificationStatus(
     client: SupabaseClient<Database>,
     cookId: string,
-    isVerified: boolean,
-    policeStatus: string
+    isApproved: boolean,
+    verificationStatus: string = 'verified'
   ) {
     const { data, error } = await client
-      .from('cook_details')
+      .from('cooks')
       .update({
-        is_verified: isVerified,
-        police_verification_status: policeStatus,
+        is_approved: isApproved,
+        verification_status: verificationStatus,
         updated_at: new Date().toISOString(),
       })
-      .eq('cook_id', cookId)
+      .or(`id.eq.${cookId},profile_id.eq.${cookId}`)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
     return data;
@@ -200,12 +207,12 @@ export class CooksRepository extends BaseRepository<'cook_details'> {
 
   async registerCookDetails(
     client: SupabaseClient<Database>,
-    cookDetails: Database['public']['Tables']['cook_details']['Insert']
+    cookData: Database['public']['Tables']['cooks']['Insert']
   ) {
     return this.handleQuery(
       client
-        .from('cook_details')
-        .upsert(cookDetails, { onConflict: 'cook_id' })
+        .from('cooks')
+        .upsert(cookData)
         .select()
         .single()
     );

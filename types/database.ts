@@ -409,45 +409,231 @@ export type Database = {
         };
         Relationships: [];
       };
-      cook_details: {
+      cooks: {
         Row: {
           id: string;
-          cook_id: string;
+          profile_id: string;
+          display_name: string;
           bio: string | null;
-          experience_years: number;
-          speciality: string[] | null;
+          experience_years: number | null;
           hourly_rate: number;
-          is_verified: boolean;
-          police_verification_status: string;
-          aadhaar_number: string | null;
-          bank_details: Record<string, unknown> | null;
+          city_id: string;
+          average_rating: number | null;
+          total_reviews: number | null;
+          verification_status: string | null;
+          is_approved: boolean | null;
+          is_available: boolean | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
-          cook_id: string;
+          profile_id: string;
+          display_name: string;
           bio?: string | null;
-          experience_years?: number;
-          speciality?: string[] | null;
-          hourly_rate?: number;
-          is_verified?: boolean;
-          police_verification_status?: string;
-          aadhaar_number?: string | null;
-          bank_details?: Record<string, unknown> | null;
+          experience_years?: number | null;
+          hourly_rate: number;
+          city_id: string;
+          average_rating?: number | null;
+          total_reviews?: number | null;
+          verification_status?: string | null;
+          is_approved?: boolean | null;
+          is_available?: boolean | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
+          id?: string;
+          profile_id?: string;
+          display_name?: string;
           bio?: string | null;
-          experience_years?: number;
-          speciality?: string[] | null;
+          experience_years?: number | null;
           hourly_rate?: number;
-          is_verified?: boolean;
-          police_verification_status?: string;
-          aadhaar_number?: string | null;
-          bank_details?: Record<string, unknown> | null;
+          city_id?: string;
+          average_rating?: number | null;
+          total_reviews?: number | null;
+          verification_status?: string | null;
+          is_approved?: boolean | null;
+          is_available?: boolean | null;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      cook_availability: {
+        Row: {
+          id: string;
+          cook_id: string;
+          day_of_week: number;
+          start_time: string;
+          end_time: string;
+          is_available: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          cook_id: string;
+          day_of_week: number;
+          start_time: string;
+          end_time: string;
+          is_available?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          cook_id?: string;
+          day_of_week?: number;
+          start_time?: string;
+          end_time?: string;
+          is_available?: boolean;
+        };
+        Relationships: [];
+      };
+      cook_bank_details: {
+        Row: {
+          id: string;
+          cook_id: string;
+          account_number: string;
+          ifsc_code: string;
+          bank_name: string;
+          account_holder_name: string;
+          upi_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          cook_id: string;
+          account_number: string;
+          ifsc_code: string;
+          bank_name: string;
+          account_holder_name: string;
+          upi_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          cook_id?: string;
+          account_number?: string;
+          ifsc_code?: string;
+          bank_name?: string;
+          account_holder_name?: string;
+          upi_id?: string | null;
+        };
+        Relationships: [];
+      };
+      cook_certifications: {
+        Row: {
+          id: string;
+          cook_id: string;
+          title: string;
+          certificate_url: string | null;
+          issued_by: string | null;
+          issue_date: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          cook_id: string;
+          title: string;
+          certificate_url?: string | null;
+          issued_by?: string | null;
+          issue_date?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          cook_id?: string;
+          title?: string;
+          certificate_url?: string | null;
+          issued_by?: string | null;
+          issue_date?: string | null;
+        };
+        Relationships: [];
+      };
+      cook_cuisines: {
+        Row: {
+          id: string;
+          cook_id: string;
+          cuisine_name: string;
+          is_specialty: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          cook_id: string;
+          cuisine_name: string;
+          is_specialty?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          cook_id?: string;
+          cuisine_name?: string;
+          is_specialty?: boolean;
+        };
+        Relationships: [];
+      };
+      cook_documents: {
+        Row: {
+          id: string;
+          cook_id: string;
+          document_type: string;
+          document_url: string;
+          verification_status: string;
+          remarks: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          cook_id: string;
+          document_type: string;
+          document_url: string;
+          verification_status?: string;
+          remarks?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          cook_id?: string;
+          document_type?: string;
+          document_url?: string;
+          verification_status?: string;
+          remarks?: string | null;
+        };
+        Relationships: [];
+      };
+      cook_languages: {
+        Row: {
+          id: string;
+          cook_id: string;
+          language: string;
+          proficiency: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          cook_id: string;
+          language: string;
+          proficiency?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          cook_id?: string;
+          language?: string;
+          proficiency?: string | null;
+        };
+        Relationships: [];
+      };
+      saved_cooks: {
+        Row: {
+          id: string;
+          customer_id: string;
+          cook_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          customer_id: string;
+          cook_id: string;
+          created_at?: string;
+        };
+        Update: {
+          customer_id?: string;
+          cook_id?: string;
         };
         Relationships: [];
       };
