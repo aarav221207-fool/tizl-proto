@@ -107,17 +107,108 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
   }
 
   async getDashboardMetrics(client: SupabaseClient<Database>) {
-    const [bookingsRes, cooksRes, customersRes, servicesRes, citiesRes, addressesRes] = await Promise.all([
+    const [
+      bookingsRes,
+      cooksProfilesRes,
+      cookDetailsRes,
+      customersRes,
+      servicesRes,
+      citiesRes,
+      addressesRes,
+    ] = await Promise.all([
       client.from('bookings').select('*'),
-      client.from('profiles').select('*, cook_details(*)').eq('role', 'cook'),
+      client.from('profiles').select('*').eq('role', 'cook'),
+      client.from('cook_details').select('*'),
       client.from('profiles').select('*').eq('role', 'customer'),
       client.from('services').select('*'),
       client.from('cities').select('*'),
       client.from('addresses').select('*'),
     ]);
 
+    if (bookingsRes.error) {
+      console.error('[Dashboard Metrics] Error querying "bookings":', {
+        code: bookingsRes.error.code,
+        message: bookingsRes.error.message,
+        details: bookingsRes.error.details,
+        hint: bookingsRes.error.hint,
+      });
+    }
+    if (cooksProfilesRes.error) {
+      console.error('[Dashboard Metrics] Error querying "profiles" (cooks):', {
+        code: cooksProfilesRes.error.code,
+        message: cooksProfilesRes.error.message,
+        details: cooksProfilesRes.error.details,
+        hint: cooksProfilesRes.error.hint,
+      });
+    }
+    if (cookDetailsRes.error) {
+      console.error('[Dashboard Metrics] Error querying "cook_details":', {
+        code: cookDetailsRes.error.code,
+        message: cookDetailsRes.error.message,
+        details: cookDetailsRes.error.details,
+        hint: cookDetailsRes.error.hint,
+      });
+    }
+    if (customersRes.error) {
+      console.error('[Dashboard Metrics] Error querying "profiles" (customers):', {
+        code: customersRes.error.code,
+        message: customersRes.error.message,
+        details: customersRes.error.details,
+        hint: customersRes.error.hint,
+      });
+    }
+    if (servicesRes.error) {
+      console.error('[Dashboard Metrics] Error querying "services":', {
+        code: servicesRes.error.code,
+        message: servicesRes.error.message,
+        details: servicesRes.error.details,
+        hint: servicesRes.error.hint,
+      });
+    }
+    if (citiesRes.error) {
+      console.error('[Dashboard Metrics] Error querying "cities":', {
+        code: citiesRes.error.code,
+        message: citiesRes.error.message,
+        details: citiesRes.error.details,
+        hint: citiesRes.error.hint,
+      });
+    }
+    if (addressesRes.error) {
+      console.error('[Dashboard Metrics] Error querying "addresses":', {
+        code: addressesRes.error.code,
+        message: addressesRes.error.message,
+        details: addressesRes.error.details,
+        hint: addressesRes.error.hint,
+      });
+    }
+
+    const errors = [
+      bookingsRes.error ? `bookings: ${bookingsRes.error.message}` : null,
+      cooksProfilesRes.error ? `cook profiles: ${cooksProfilesRes.error.message}` : null,
+      cookDetailsRes.error ? `cook_details: ${cookDetailsRes.error.message}` : null,
+      customersRes.error ? `customer profiles: ${customersRes.error.message}` : null,
+      servicesRes.error ? `services: ${servicesRes.error.message}` : null,
+      citiesRes.error ? `cities: ${citiesRes.error.message}` : null,
+      addressesRes.error ? `addresses: ${addressesRes.error.message}` : null,
+    ].filter(Boolean);
+
+    if (errors.length > 0) {
+      throw new Error(`Database query failed — ${errors.join('; ')}`);
+    }
+
     const bookings = bookingsRes.data || [];
-    const cooks = cooksRes.data || [];
+    const cooksProfiles = cooksProfilesRes.data || [];
+    const cookDetailsList = cookDetailsRes.data || [];
+
+    // In-memory join for cooks and cook_details
+    const cooks = cooksProfiles.map((profile) => {
+      const details = cookDetailsList.filter((d) => d.cook_id === profile.id);
+      return {
+        ...profile,
+        cook_details: details.length > 0 ? details[0] : null,
+      };
+    });
+
     const customers = customersRes.data || [];
     const services = servicesRes.data || [];
     const cities = citiesRes.data || [];
@@ -125,30 +216,41 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
 
     // Calculate total revenue from completed/paid bookings
     const completedBookings = bookings.filter((b) => ['completed', 'paid'].includes(b.status));
-    const totalRevenue = completedBookings.reduce((sum, b) => sum + (b.total_amount || 0), 0);
+    const totalRevenue = completedBookings.reduce(
+      (sum, b) => sum + (Number(b.total_amount) || 0),
+      0
+    );
 
     // Cooks metrics
     const activeCooks = cooks.filter((c) => {
       const details = Array.isArray(c.cook_details) ? c.cook_details[0] : c.cook_details;
-      return typeof details === 'object' && details !== null && 'is_verified' in details ? (details as { is_verified: boolean }).is_verified : false;
+      const isVerified =
+        typeof details === 'object' && details !== null && 'is_verified' in details
+          ? (details as { is_verified: boolean }).is_verified
+          : false;
+      return isVerified || c.status === 'active';
     }).length;
-    const onlineCooks = cooks.filter((c) => c.status === 'active' || c.status === 'online').length;
+    const onlineCooks = cooks.filter(
+      (c) => c.status === 'active' || c.status === 'online'
+    ).length;
 
     // Funnel breakdown
     const bookingFunnel: Record<string, number> = {
       pending_confirmation: 0,
       searching: 0,
+      matched: 0,
       accepted: 0,
+      cook_assigned: 0,
       cook_arriving: 0,
       cooking: 0,
       completed: 0,
       cancelled: 0,
+      refunded: 0,
     };
 
     bookings.forEach((b) => {
-      if (bookingFunnel[b.status] !== undefined) {
-        bookingFunnel[b.status]++;
-      }
+      const statusKey = b.status || 'pending_confirmation';
+      bookingFunnel[statusKey] = (bookingFunnel[statusKey] || 0) + 1;
     });
 
     // Top services aggregation
@@ -161,10 +263,12 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
       }
       serviceCountMap[sName].count += 1;
       if (['completed', 'paid'].includes(b.status)) {
-        serviceCountMap[sName].revenue += b.total_amount || 0;
+        serviceCountMap[sName].revenue += Number(b.total_amount) || 0;
       }
     });
-    const topServices = Object.values(serviceCountMap).sort((a, b) => b.count - a.count).slice(0, 5);
+    const topServices = Object.values(serviceCountMap)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
 
     // Top cities aggregation
     const addressCityMap = new Map(addresses.map((a) => [a.id, a.city_id]));
@@ -178,7 +282,9 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
       }
       cityCountMap[cityName].count += 1;
     });
-    const topCities = Object.values(cityCountMap).sort((a, b) => b.count - a.count).slice(0, 5);
+    const topCities = Object.values(cityCountMap)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
 
     // Daily trends (last 7 days)
     const trendsMap: Record<string, { date: string; bookings: number; revenue: number }> = {};
@@ -195,7 +301,7 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
       if (bDate && trendsMap[bDate]) {
         trendsMap[bDate].bookings += 1;
         if (['completed', 'paid'].includes(b.status)) {
-          trendsMap[bDate].revenue += b.total_amount || 0;
+          trendsMap[bDate].revenue += Number(b.total_amount) || 0;
         }
       }
     });

@@ -105,13 +105,13 @@ export class CustomersRepository extends BaseRepository<'profiles'> {
         client.from('customer_details').select('*').eq('customer_id', customerId).maybeSingle(),
         client
           .from('bookings')
-          .select('*, service:services(name, category), cook:profiles!bookings_cook_id_fkey(full_name, phone)')
+          .select('*, service:services(name, category), cook:profiles!cook_id(full_name, phone)')
           .eq('customer_id', customerId)
           .order('created_at', { ascending: false }),
         client.from('addresses').select('*, city:cities(name)').eq('customer_id', customerId),
         client
           .from('reviews')
-          .select('*, cook:profiles!reviews_cook_id_fkey(full_name)')
+          .select('*, cook:profiles!cook_id(full_name)')
           .eq('customer_id', customerId)
           .order('created_at', { ascending: false }),
         client

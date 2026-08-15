@@ -49,8 +49,8 @@ export class BookingsRepository extends BaseRepository<'bookings'> {
         *,
         services (*),
         addresses (*),
-        customer:profiles!bookings_customer_id_fkey (*),
-        cook:profiles!bookings_cook_id_fkey (*),
+        customer:profiles!customer_id (*),
+        cook:profiles!cook_id (*),
         booking_timeline (*),
         booking_history (*),
         booking_cancellations (*)
@@ -65,7 +65,7 @@ export class BookingsRepository extends BaseRepository<'bookings'> {
   async getCustomerBookings(client: SupabaseClient<Database>, customerId: string) {
     const { data, error } = await client
       .from('bookings')
-      .select('*, services(*), addresses(*), cook:profiles!bookings_cook_id_fkey(full_name, phone, avatar_url)')
+      .select('*, services(*), addresses(*), cook:profiles!cook_id(full_name, phone, avatar_url)')
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false });
 
@@ -76,7 +76,7 @@ export class BookingsRepository extends BaseRepository<'bookings'> {
   async getCookBookings(client: SupabaseClient<Database>, cookId: string) {
     const { data, error } = await client
       .from('bookings')
-      .select('*, services(*), addresses(*), customer:profiles!bookings_customer_id_fkey(full_name, phone)')
+      .select('*, services(*), addresses(*), customer:profiles!customer_id(full_name, phone)')
       .eq('cook_id', cookId)
       .order('booking_date', { ascending: true });
 
@@ -87,7 +87,7 @@ export class BookingsRepository extends BaseRepository<'bookings'> {
   async listRecentBookings(client: SupabaseClient<Database>, limit = 50) {
     const { data, error } = await client
       .from('bookings')
-      .select('*, services(*), addresses(*), customer:profiles!bookings_customer_id_fkey(full_name), cook:profiles!bookings_cook_id_fkey(full_name)')
+      .select('*, services(*), addresses(*), customer:profiles!customer_id(full_name, phone, email), cook:profiles!cook_id(full_name, phone)')
       .order('created_at', { ascending: false })
       .limit(limit);
 

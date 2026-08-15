@@ -48,7 +48,7 @@ export default function AdminAuditLogsPage() {
       const res = await fetch(`/api/admin/audit-logs?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch audit logs');
       const data = await res.json();
-      setLogs(data.logs || []);
+      setLogs(data.data?.logs || data.logs || []);
     } catch (err: any) {
       console.error(err);
     } finally {
@@ -68,7 +68,7 @@ export default function AdminAuditLogsPage() {
         const res = await fetch(`/api/admin/audit-logs?${params.toString()}`);
         if (!res.ok) throw new Error('Failed to fetch audit logs');
         const data = await res.json();
-        if (!ignore) setLogs(data.logs || []);
+        if (!ignore) setLogs(data.data?.logs || data.logs || []);
       } catch (err: any) {
         console.error(err);
       } finally {

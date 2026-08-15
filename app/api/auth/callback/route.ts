@@ -93,7 +93,7 @@ export async function GET(request: Request) {
 
     // 2. Redirect based on verified role
     if (userRole === 'admin') {
-      return NextResponse.redirect(`${effectiveOrigin}/admin/dashboard`);
+      return NextResponse.redirect(`${effectiveOrigin}/admin`);
     }
 
     if (userRole === 'cook') {

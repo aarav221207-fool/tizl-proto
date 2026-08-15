@@ -53,7 +53,7 @@ export function errorResponse(error: unknown): NextResponse<ApiResponse<never>> 
       success: false,
       error: {
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'An unexpected internal error occurred.',
+        message: error instanceof Error ? error.message : 'An unexpected internal error occurred.',
       },
     },
     { status: 500 }

@@ -43,8 +43,8 @@ export class ExportRepository extends BaseRepository<'bookings'> {
         platform_fee,
         total_amount,
         created_at,
-        customer:profiles!bookings_customer_id_fkey(full_name, phone, email),
-        cook:profiles!bookings_cook_id_fkey(full_name, phone),
+        customer:profiles!customer_id(full_name, phone, email),
+        cook:profiles!cook_id(full_name, phone),
         service:services(name, category),
         address:addresses(house_number, street, locality, pincode, city_id)
       `)
@@ -160,8 +160,8 @@ export class ExportRepository extends BaseRepository<'bookings'> {
         rating,
         comment,
         created_at,
-        customer:profiles!reviews_customer_id_fkey(full_name),
-        cook:profiles!reviews_cook_id_fkey(full_name)
+        customer:profiles!customer_id(full_name),
+        cook:profiles!cook_id(full_name)
       `)
       .order('created_at', { ascending: false });
 

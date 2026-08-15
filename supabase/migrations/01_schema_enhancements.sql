@@ -171,6 +171,8 @@ RETURNS boolean AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM admin_users WHERE profile_id = user_id
+  ) OR EXISTS (
+    SELECT 1 FROM profiles WHERE id = user_id AND role = 'admin'
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -210,10 +212,108 @@ DROP POLICY IF EXISTS "Customers can create bookings" ON bookings;
 CREATE POLICY "Customers can create bookings" ON bookings
   FOR INSERT WITH CHECK (customer_id = auth.uid());
 
--- Audit Logs Policies (Read-only for Admins, no client inserts/updates)
+DROP POLICY IF EXISTS "Admins can update bookings" ON bookings;
+CREATE POLICY "Admins can update bookings" ON bookings
+  FOR UPDATE USING (is_admin(auth.uid()));
+
+-- Admin Users Policies
+DROP POLICY IF EXISTS "Admins can view admin_users" ON admin_users;
+CREATE POLICY "Admins can view admin_users" ON admin_users
+  FOR SELECT USING (profile_id = auth.uid() OR is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS "Admins can manage admin_users" ON admin_users;
+CREATE POLICY "Admins can manage admin_users" ON admin_users
+  FOR ALL USING (is_admin(auth.uid()));
+
+-- Audit Logs Policies
 DROP POLICY IF EXISTS "Admins can view audit logs" ON audit_logs;
 CREATE POLICY "Admins can view audit logs" ON audit_logs
   FOR SELECT USING (is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS "Admins can insert audit logs" ON audit_logs;
+CREATE POLICY "Admins can insert audit logs" ON audit_logs
+  FOR INSERT WITH CHECK (is_admin(auth.uid()) OR auth.uid() IS NOT NULL);
+
+-- Booking Subtables Policies
+DROP POLICY IF EXISTS "Users can view booking history" ON booking_history;
+CREATE POLICY "Users can view booking history" ON booking_history
+  FOR SELECT USING (is_admin(auth.uid()) OR EXISTS (
+    SELECT 1 FROM bookings WHERE bookings.id = booking_history.booking_id AND (bookings.customer_id = auth.uid() OR bookings.cook_id = auth.uid())
+  ));
+
+DROP POLICY IF EXISTS "Admins can insert booking history" ON booking_history;
+CREATE POLICY "Admins can insert booking history" ON booking_history
+  FOR INSERT WITH CHECK (is_admin(auth.uid()) OR auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "Users can view booking timeline" ON booking_timeline;
+CREATE POLICY "Users can view booking timeline" ON booking_timeline
+  FOR SELECT USING (is_admin(auth.uid()) OR EXISTS (
+    SELECT 1 FROM bookings WHERE bookings.id = booking_timeline.booking_id AND (bookings.customer_id = auth.uid() OR bookings.cook_id = auth.uid())
+  ));
+
+DROP POLICY IF EXISTS "Admins can insert booking timeline" ON booking_timeline;
+CREATE POLICY "Admins can insert booking timeline" ON booking_timeline
+  FOR INSERT WITH CHECK (is_admin(auth.uid()) OR auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "Users can view booking notes" ON booking_notes;
+CREATE POLICY "Users can view booking notes" ON booking_notes
+  FOR SELECT USING (is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS "Admins can insert booking notes" ON booking_notes;
+CREATE POLICY "Admins can insert booking notes" ON booking_notes
+  FOR INSERT WITH CHECK (is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS "Users can view booking cancellations" ON booking_cancellations;
+CREATE POLICY "Users can view booking cancellations" ON booking_cancellations
+  FOR SELECT USING (is_admin(auth.uid()) OR EXISTS (
+    SELECT 1 FROM bookings WHERE bookings.id = booking_cancellations.booking_id AND (bookings.customer_id = auth.uid() OR bookings.cook_id = auth.uid())
+  ));
+
+DROP POLICY IF EXISTS "Admins can insert booking cancellations" ON booking_cancellations;
+CREATE POLICY "Admins can insert booking cancellations" ON booking_cancellations
+  FOR INSERT WITH CHECK (is_admin(auth.uid()) OR auth.uid() IS NOT NULL);
+
+-- Cook Details Policies
+ALTER TABLE cook_details ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can view cook details" ON cook_details;
+CREATE POLICY "Anyone can view cook details" ON cook_details
+  FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Cooks or admins can manage cook details" ON cook_details;
+CREATE POLICY "Cooks or admins can manage cook details" ON cook_details
+  FOR ALL USING (cook_id = auth.uid() OR is_admin(auth.uid()));
+
+-- Customer Details Policies
+ALTER TABLE customer_details ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Customers or admins can view customer details" ON customer_details;
+CREATE POLICY "Customers or admins can view customer details" ON customer_details
+  FOR SELECT USING (customer_id = auth.uid() OR is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS "Customers or admins can manage customer details" ON customer_details;
+CREATE POLICY "Customers or admins can manage customer details" ON customer_details
+  FOR ALL USING (customer_id = auth.uid() OR is_admin(auth.uid()));
+
+-- Cities & Services Policies
+ALTER TABLE cities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE services ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can view cities" ON cities;
+CREATE POLICY "Anyone can view cities" ON cities
+  FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Admins can manage cities" ON cities;
+CREATE POLICY "Admins can manage cities" ON cities
+  FOR ALL USING (is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS "Anyone can view services" ON services;
+CREATE POLICY "Anyone can view services" ON services
+  FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Admins can manage services" ON services;
+CREATE POLICY "Admins can manage services" ON services
+  FOR ALL USING (is_admin(auth.uid()));
 
 -- ----------------------------------------------------------------------------
 -- 5. IMMUTABLE AUDIT LOG TRIGGER

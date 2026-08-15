@@ -10,7 +10,7 @@ export class ReviewsRepository extends BaseRepository<'reviews'> {
   async getCookReviews(client: SupabaseClient<Database>, cookId: string) {
     const { data, error } = await client
       .from('reviews')
-      .select('*, customer:profiles!reviews_customer_id_fkey(full_name, avatar_url)')
+      .select('*, customer:profiles!customer_id(full_name, avatar_url)')
       .eq('cook_id', cookId)
       .order('created_at', { ascending: false });
 

@@ -31,12 +31,13 @@ export class CooksRepository extends BaseRepository<'cook_details'> {
   }
 
   async listAllCooksAdmin(client: SupabaseClient<Database>) {
-    const [profilesRes, bookingsRes, reviewsRes] = await Promise.all([
+    const [profilesRes, detailsRes, bookingsRes, reviewsRes] = await Promise.all([
       client
         .from('profiles')
-        .select('*, cook_details(*)')
+        .select('*')
         .eq('role', 'cook')
         .order('created_at', { ascending: false }),
+      client.from('cook_details').select('*'),
       client.from('bookings').select('cook_id, status, total_amount'),
       client.from('reviews').select('cook_id, rating'),
     ]);
@@ -44,6 +45,7 @@ export class CooksRepository extends BaseRepository<'cook_details'> {
     if (profilesRes.error) throw profilesRes.error;
 
     const profiles = profilesRes.data || [];
+    const detailsList = detailsRes.data || [];
     const bookings = bookingsRes.data || [];
     const reviews = reviewsRes.data || [];
 
@@ -86,12 +88,13 @@ export class CooksRepository extends BaseRepository<'cook_details'> {
       };
       const rating = cookRatingMap.get(p.id);
       const avgRating = rating && rating.totalRatings > 0 ? rating.sumRatings / rating.totalRatings : 0;
-
-      const details = Array.isArray(p.cook_details) ? p.cook_details[0] : p.cook_details;
+      
+      const detailsArr = detailsList.filter(d => d.cook_id === p.id);
+      const details = detailsArr.length > 0 ? detailsArr[0] : null;
 
       return {
         ...p,
-        cook_details: details || null,
+        cook_details: details,
         stats: {
           totalBookings: stats.totalBookings,
           completedBookings: stats.completedBookings,
@@ -109,12 +112,12 @@ export class CooksRepository extends BaseRepository<'cook_details'> {
       client.from('cook_details').select('*').eq('cook_id', cookId).maybeSingle(),
       client
         .from('bookings')
-        .select('*, service:services(name, category), customer:profiles!bookings_customer_id_fkey(full_name, phone)')
+        .select('*, service:services(name, category), customer:profiles!customer_id(full_name, phone)')
         .eq('cook_id', cookId)
         .order('created_at', { ascending: false }),
       client
         .from('reviews')
-        .select('*, customer:profiles!reviews_customer_id_fkey(full_name)')
+        .select('*, customer:profiles!customer_id(full_name)')
         .eq('cook_id', cookId)
         .order('created_at', { ascending: false }),
       client

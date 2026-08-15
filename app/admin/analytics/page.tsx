@@ -49,10 +49,10 @@ export default function AdminAnalyticsPage() {
       const res = await fetch('/api/admin/analytics');
       if (!res.ok) throw new Error('Failed to fetch analytics data');
       const json = await res.json();
-      setData(json.analytics);
+      setData(json.data?.analytics || json.analytics || null);
     } catch (err: any) {
       console.error(err);
-    } fontFinally: {
+    } finally {
       setLoading(false);
       setRefreshing(false);
     }
@@ -66,7 +66,7 @@ export default function AdminAnalyticsPage() {
         const res = await fetch('/api/admin/analytics');
         if (!res.ok) throw new Error('Failed to fetch analytics data');
         const json = await res.json();
-        if (!ignore) setData(json.analytics);
+        if (!ignore) setData(json.data?.analytics || json.analytics || null);
       } catch (err: any) {
         console.error(err);
       } finally {

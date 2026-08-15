@@ -100,7 +100,7 @@ export default function AdminCustomersPage() {
         throw new Error(errData.error?.message || 'Failed to fetch customer list');
       }
       const data = await res.json();
-      setCustomers(data.customers || []);
+      setCustomers(data.data?.customers || data.customers || []);
     } catch (err: any) {
       setError(err.message || 'An error occurred while loading customers.');
     } finally {
@@ -121,7 +121,7 @@ export default function AdminCustomersPage() {
           throw new Error(errData.error?.message || 'Failed to fetch customer list');
         }
         const data = await res.json();
-        if (!ignore) setCustomers(data.customers || []);
+        if (!ignore) setCustomers(data.data?.customers || data.customers || []);
       } catch (err: any) {
         if (!ignore) setError(err.message || 'An error occurred while loading customers.');
       } finally {
@@ -148,7 +148,7 @@ export default function AdminCustomersPage() {
         const res = await fetch(`/api/admin/customers/${activeCustomerId}`);
         if (!res.ok) throw new Error('Failed to fetch customer profile');
         const data = await res.json();
-        if (!ignore) setCustomerProfile(data.customerProfile);
+        if (!ignore) setCustomerProfile(data.data?.customerProfile || data.customerProfile);
       } catch (err: any) {
         console.error('Error fetching customer profile:', err);
       } finally {
@@ -215,7 +215,7 @@ export default function AdminCustomersPage() {
         const profileRes = await fetch(`/api/admin/customers/${actionModal.customerId}`);
         if (profileRes.ok) {
           const profileData = await profileRes.json();
-          setCustomerProfile(profileData.customerProfile);
+          setCustomerProfile(profileData.data?.customerProfile || profileData.customerProfile);
         }
       }
 

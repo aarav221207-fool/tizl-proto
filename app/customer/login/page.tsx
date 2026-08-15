@@ -31,7 +31,7 @@ function CustomerLoginContent() {
         return;
       }
       if (user?.role === 'admin') {
-        router.push('/admin/dashboard');
+        router.push('/admin');
         return;
       }
       router.push(redirect);

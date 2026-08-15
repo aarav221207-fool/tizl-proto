@@ -49,11 +49,13 @@ export default function AdminDashboardPage() {
     setError(null);
     try {
       const res = await fetch('/api/admin/dashboard');
-      if (!res.ok) throw new Error('Failed to load dashboard metrics');
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error?.message || data.error || 'Failed to load dashboard metrics');
+      }
       setMetrics(data.data?.metrics || null);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error fetching metrics');
+    } catch (err: any) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
@@ -64,11 +66,13 @@ export default function AdminDashboardPage() {
     const load = async () => {
       try {
         const res = await fetch('/api/admin/dashboard');
-        if (!res.ok) throw new Error('Failed to load dashboard metrics');
         const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error?.message || data.error || 'Failed to load dashboard metrics');
+        }
         if (!ignore) setMetrics(data.data?.metrics || null);
-      } catch (err: unknown) {
-        if (!ignore) setError(err instanceof Error ? err.message : 'Error fetching metrics');
+      } catch (err: any) {
+        if (!ignore) setError(err instanceof Error ? err.message : String(err));
       } finally {
         if (!ignore) setLoading(false);
       }

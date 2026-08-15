@@ -77,10 +77,11 @@ export default function AdminSettingsPage() {
       const res = await fetch('/api/admin/settings');
       if (!res.ok) throw new Error('Failed to fetch settings');
       const data = await res.json();
-      setCities(data.cities || []);
-      setServices(data.services || []);
-      setAdminUsers(data.adminUsers || []);
-      if (data.systemConfig) setConfig(data.systemConfig);
+      const payload = data.data || data;
+      setCities(payload.cities || []);
+      setServices(payload.services || []);
+      setAdminUsers(payload.adminUsers || []);
+      if (payload.systemConfig) setConfig(payload.systemConfig);
     } catch (err: any) {
       console.error(err);
     } finally {
@@ -98,10 +99,11 @@ export default function AdminSettingsPage() {
         if (!res.ok) throw new Error('Failed to fetch settings');
         const data = await res.json();
         if (!ignore) {
-          setCities(data.cities || []);
-          setServices(data.services || []);
-          setAdminUsers(data.adminUsers || []);
-          if (data.systemConfig) setConfig(data.systemConfig);
+          const payload = data.data || data;
+          setCities(payload.cities || []);
+          setServices(payload.services || []);
+          setAdminUsers(payload.adminUsers || []);
+          if (payload.systemConfig) setConfig(payload.systemConfig);
         }
       } catch (err: any) {
         console.error(err);

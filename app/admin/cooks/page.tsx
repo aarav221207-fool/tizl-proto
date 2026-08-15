@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import Image from 'next/image';
 import {
   UserCheck,
   Search,
@@ -120,7 +121,7 @@ export default function AdminCooksPage() {
         throw new Error(errData.error?.message || 'Failed to fetch cooks list');
       }
       const data = await res.json();
-      setCooks(data.cooks || []);
+      setCooks(data.data?.cooks || data.cooks || []);
     } catch (err: any) {
       setError(err.message || 'An error occurred while loading cooks.');
     } finally {
@@ -142,7 +143,7 @@ export default function AdminCooksPage() {
         }
         const data = await res.json();
         if (!ignore) {
-          setCooks(data.cooks || []);
+          setCooks(data.data?.cooks || data.cooks || []);
         }
       } catch (err: any) {
         if (!ignore) setError(err.message || 'An error occurred while loading cooks.');
@@ -171,7 +172,7 @@ export default function AdminCooksPage() {
         const res = await fetch(`/api/admin/cooks/${activeCookId}`);
         if (!res.ok) throw new Error('Failed to fetch cook profile');
         const data = await res.json();
-        if (!ignore) setCookProfile(data.cookProfile);
+        if (!ignore) setCookProfile(data.data?.cookProfile || data.cookProfile);
       } catch (err: any) {
         console.error('Error fetching cook profile:', err);
       } finally {
@@ -284,7 +285,7 @@ export default function AdminCooksPage() {
         const profileRes = await fetch(`/api/admin/cooks/${actionModal.cookId}`);
         if (profileRes.ok) {
           const profileData = await profileRes.json();
-          setCookProfile(profileData.cookProfile);
+          setCookProfile(profileData.data?.cookProfile || profileData.cookProfile);
         }
       }
 
@@ -567,10 +568,13 @@ export default function AdminCooksPage() {
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0 text-sm font-bold text-slate-300">
                             {cook.avatar_url ? (
-                              <img
+                              <Image
                                 src={cook.avatar_url}
                                 alt={cook.full_name || 'Cook'}
+                                width={40}
+                                height={40}
                                 className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
                               />
                             ) : (
                               (cook.full_name || 'C').charAt(0).toUpperCase()
@@ -689,10 +693,13 @@ export default function AdminCooksPage() {
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-slate-200 text-lg overflow-hidden">
                   {cookProfile?.profile?.avatar_url ? (
-                    <img
+                    <Image
                       src={cookProfile.profile.avatar_url}
-                      alt={cookProfile.profile.full_name}
+                      alt={cookProfile.profile.full_name || 'Cook'}
+                      width={48}
+                      height={48}
                       className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
                     />
                   ) : (
                     (cookProfile?.profile?.full_name || 'C').charAt(0).toUpperCase()
