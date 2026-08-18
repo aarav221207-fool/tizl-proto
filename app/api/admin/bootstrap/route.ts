@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { successResponse, errorResponse } from '@/lib/api-response';
 import { ForbiddenError, BadRequestError, UnauthorizedError } from '@/lib/errors';
 import { adminRepository } from '@/repositories/admin.repository';
@@ -7,9 +8,10 @@ import { adminRepository } from '@/repositories/admin.repository';
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
+    const adminSupabase = createAdminClient();
 
     // 1. Check if ANY Super Admin already exists
-    const { data: existingSuperAdmins, error: checkError } = await supabase
+    const { data: existingSuperAdmins, error: checkError } = await adminSupabase
       .from('admin_users')
       .select('id, profile_id')
       .eq('designation', 'super_admin');
@@ -54,7 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Promote profile role to 'admin'
-    const { error: profileError } = await supabase
+    const { error: profileError } = await adminSupabase
       .from('profiles')
       .update({ role: 'admin', updated_at: new Date().toISOString() })
       .eq('id', userId);
@@ -72,7 +74,7 @@ export async function POST(req: NextRequest) {
       view_audit_logs: true,
     };
 
-    const { data: newSuperAdmin, error: adminInsertError } = await supabase
+    const { data: newSuperAdmin, error: adminInsertError } = await adminSupabase
       .from('admin_users')
       .upsert(
         {
@@ -89,7 +91,7 @@ export async function POST(req: NextRequest) {
 
     // 5. Record Audit Log
     await adminRepository.recordAuditLog(
-      supabase,
+      adminSupabase,
       userId,
       'BOOTSTRAP_SUPER_ADMIN_CREATED',
       newSuperAdmin.id,
@@ -101,22 +103,35 @@ export async function POST(req: NextRequest) {
       message: 'First Super Admin successfully initialized. Bootstrap route is now permanently disabled.',
       superAdmin: newSuperAdmin,
     });
-  } catch (err) {
+  } catch (err: any) {
+    console.error('[Admin Bootstrap API] Error:', {
+      message: err?.message || String(err),
+      stack: err?.stack,
+    });
     return errorResponse(err);
   }
 }
 
 export async function GET() {
   try {
-    const supabase = await createClient();
+    let isAvailable = true;
+    try {
+      const adminSupabase = createAdminClient();
+      const { data: existingSuperAdmins } = await adminSupabase
+        .from('admin_users')
+        .select('id')
+        .eq('designation', 'super_admin');
 
-    // Check bootstrap availability status
-    const { data: existingSuperAdmins } = await supabase
-      .from('admin_users')
-      .select('id')
-      .eq('designation', 'super_admin');
+      isAvailable = !existingSuperAdmins || existingSuperAdmins.length === 0;
+    } catch {
+      const supabase = await createClient();
+      const { data: existingSuperAdmins } = await supabase
+        .from('admin_users')
+        .select('id')
+        .eq('designation', 'super_admin');
 
-    const isAvailable = !existingSuperAdmins || existingSuperAdmins.length === 0;
+      isAvailable = !existingSuperAdmins || existingSuperAdmins.length === 0;
+    }
 
     return successResponse({
       bootstrapAvailable: isAvailable,
@@ -124,7 +139,8 @@ export async function GET() {
         ? 'System initial state: No Super Admin detected. Bootstrap is enabled.'
         : 'Bootstrap disabled: Super Admin already exists.',
     });
-  } catch (err) {
+  } catch (err: any) {
     return errorResponse(err);
   }
 }
+

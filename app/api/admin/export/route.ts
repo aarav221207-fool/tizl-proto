@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticateAdminRequest, checkAdminPermission } from '@/middleware/admin-auth';
 import { exportService, ExportType, ExportFormat } from '@/services/export.service';
 import { errorResponse } from '@/lib/api-response';
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     const adminUser = await authenticateAdminRequest();
     checkAdminPermission(adminUser, 'export_data');
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { searchParams } = new URL(req.url);
     const type = (searchParams.get('type') || 'bookings') as ExportType;
@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
       throw new BadRequestError(`Invalid export format. Must be one of: ${validFormats.join(', ')}`);
     }
 
+    console.info(`[Admin Export API] Exporting ${type} as ${format} by admin: ${adminUser.id}`);
     const result = await exportService.exportData(supabase, adminUser.id, type, format, {
       startDate,
       endDate,
@@ -53,7 +54,12 @@ export async function GET(req: NextRequest) {
         'Cache-Control': 'no-store, max-age=0',
       },
     });
-  } catch (err) {
+  } catch (err: any) {
+    console.error('[Admin Export API] Error performing export:', {
+      message: err?.message || String(err),
+      stack: err?.stack,
+    });
     return errorResponse(err);
   }
 }
+

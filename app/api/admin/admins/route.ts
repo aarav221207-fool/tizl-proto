@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticateAdminRequest, checkAdminPermission, AdminDesignation } from '@/middleware/admin-auth';
 import { adminRepository } from '@/repositories/admin.repository';
 import { successResponse, errorResponse } from '@/lib/api-response';
@@ -10,11 +10,16 @@ export async function GET() {
     const adminUser = await authenticateAdminRequest();
     checkAdminPermission(adminUser, 'manage_admins');
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
+    console.info(`[Admin Admins API] Fetching admins for super admin: ${adminUser.id}`);
     const admins = await adminRepository.listAllAdmins(supabase);
 
-    return successResponse({ admins });
-  } catch (err) {
+    return successResponse({ admins: admins || [] });
+  } catch (err: any) {
+    console.error('[Admin Admins API] Error loading admins:', {
+      message: err?.message || String(err),
+      stack: err?.stack,
+    });
     return errorResponse(err);
   }
 }
@@ -24,7 +29,7 @@ export async function POST(req: NextRequest) {
     const adminUser = await authenticateAdminRequest();
     checkAdminPermission(adminUser, 'manage_admins');
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const body = await req.json();
 
     const { email, full_name, designation, phone } = body;
@@ -43,7 +48,7 @@ export async function POST(req: NextRequest) {
       .from('profiles')
       .select('id, email, full_name, role')
       .eq('email', email.trim().toLowerCase())
-      .single();
+      .maybeSingle();
 
     let targetProfileId: string;
 
@@ -140,7 +145,12 @@ export async function POST(req: NextRequest) {
       admin: newAdmin,
       message: `Admin user '${email}' created with '${designation}' role.`,
     });
-  } catch (err) {
+  } catch (err: any) {
+    console.error('[Admin Admins API] Error creating admin user:', {
+      message: err?.message || String(err),
+      stack: err?.stack,
+    });
     return errorResponse(err);
   }
 }
+

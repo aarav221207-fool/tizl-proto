@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticateAdminRequest, checkAdminPermission } from '@/middleware/admin-auth';
 import { reviewsRepository } from '@/repositories/reviews.repository';
 import { adminRepository } from '@/repositories/admin.repository';
@@ -11,7 +11,8 @@ export async function GET(req: NextRequest) {
     const adminUser = await authenticateAdminRequest();
     checkAdminPermission(adminUser, 'view_data');
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
+    console.info(`[Admin Reviews API] Fetching reviews for admin: ${adminUser.id}`);
     const reviews = await reviewsRepository.listAllReviewsAdmin(supabase);
 
     const totalReviews = reviews.length;
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
     });
 
     return successResponse({
-      reviews,
+      reviews: reviews || [],
       summary: {
         totalReviews,
         avgRating: Number(avgRating.toFixed(1)),
@@ -41,7 +42,11 @@ export async function GET(req: NextRequest) {
         designation: adminUser.designation,
       },
     });
-  } catch (err) {
+  } catch (err: any) {
+    console.error('[Admin Reviews API] Error loading reviews:', {
+      message: err?.message || String(err),
+      stack: err?.stack,
+    });
     return errorResponse(err);
   }
 }
@@ -51,7 +56,7 @@ export async function DELETE(req: NextRequest) {
     const adminUser = await authenticateAdminRequest();
     checkAdminPermission(adminUser, 'modify_settings');
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
 
@@ -71,7 +76,12 @@ export async function DELETE(req: NextRequest) {
     );
 
     return successResponse({ deleted: true, id });
-  } catch (err) {
+  } catch (err: any) {
+    console.error('[Admin Reviews API] Error deleting review:', {
+      message: err?.message || String(err),
+      stack: err?.stack,
+    });
     return errorResponse(err);
   }
 }
+

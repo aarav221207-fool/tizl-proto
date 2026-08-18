@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticateAdminRequest, checkAdminPermission } from '@/middleware/admin-auth';
 import { adminService } from '@/services/admin.service';
 import { analyticsService } from '@/services/analytics.service';
@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
     const adminUser = await authenticateAdminRequest();
     checkAdminPermission(adminUser, 'view_data');
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
+    console.info(`[Admin Analytics API] Fetching analytics for admin: ${adminUser.id}`);
 
     const [metrics, visitorAnalytics, bookingsRes, paymentsRes] = await Promise.all([
       adminService.getDashboardMetrics(supabase, adminUser.id),
@@ -18,6 +19,13 @@ export async function GET(req: NextRequest) {
       supabase.from('bookings').select('*, service:services(name), address:addresses(city:cities(name))'),
       supabase.from('payments').select('*'),
     ]);
+
+    if (bookingsRes.error) {
+      console.error('[Admin Analytics API] Error loading bookings:', bookingsRes.error);
+    }
+    if (paymentsRes.error) {
+      console.error('[Admin Analytics API] Error loading payments:', paymentsRes.error);
+    }
 
     const bookings = bookingsRes.data || [];
     const payments = paymentsRes.data || [];
@@ -56,7 +64,12 @@ export async function GET(req: NextRequest) {
         paymentMethods,
       },
     });
-  } catch (err) {
+  } catch (err: any) {
+    console.error('[Admin Analytics API] Error loading analytics:', {
+      message: err?.message || String(err),
+      stack: err?.stack,
+    });
     return errorResponse(err);
   }
 }
+

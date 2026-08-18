@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticateAdminRequest, checkAdminPermission } from '@/middleware/admin-auth';
 import { paymentsRepository } from '@/repositories/payments.repository';
 import { successResponse, errorResponse } from '@/lib/api-response';
@@ -9,7 +9,8 @@ export async function GET(req: NextRequest) {
     const adminUser = await authenticateAdminRequest();
     checkAdminPermission(adminUser, 'view_data');
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
+    console.info(`[Admin Payments API] Fetching payments for admin: ${adminUser.id}`);
     const payments = await paymentsRepository.listAllPaymentsAdmin(supabase);
 
     // Compute summary metrics
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
     const isPaytmConfigured = Boolean(process.env.PAYTM_MID && process.env.PAYTM_MERCHANT_KEY);
 
     return successResponse({
-      payments,
+      payments: payments || [],
       summary: {
         totalTransactions: payments.length,
         totalVolume,
@@ -40,7 +41,12 @@ export async function GET(req: NextRequest) {
         designation: adminUser.designation,
       },
     });
-  } catch (err) {
+  } catch (err: any) {
+    console.error('[Admin Payments API] Error loading payments:', {
+      message: err?.message || String(err),
+      stack: err?.stack,
+    });
     return errorResponse(err);
   }
 }
+

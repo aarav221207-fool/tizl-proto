@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticateAdminRequest, checkAdminPermission } from '@/middleware/admin-auth';
 import { adminService } from '@/services/admin.service';
 import { successResponse, errorResponse } from '@/lib/api-response';
@@ -10,10 +10,15 @@ export async function GET() {
     const adminUser = await authenticateAdminRequest();
     checkAdminPermission(adminUser, 'view_data');
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
+    console.info(`[Admin Cooks API] Fetching cooks for admin: ${adminUser.id}`);
     const cooks = await adminService.listAllCooksAdmin(supabase, adminUser.id);
-    return successResponse({ cooks });
-  } catch (err) {
+    return successResponse({ cooks: cooks || [] });
+  } catch (err: any) {
+    console.error('[Admin Cooks API] Error loading cooks:', {
+      message: err?.message || String(err),
+      stack: err?.stack,
+    });
     return errorResponse(err);
   }
 }
@@ -23,7 +28,7 @@ export async function POST(req: NextRequest) {
     const adminUser = await authenticateAdminRequest();
     checkAdminPermission(adminUser, 'manage_cooks');
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const body = await req.json();
 
     const { cook_id, action, reason, notes } = body;
@@ -48,7 +53,12 @@ export async function POST(req: NextRequest) {
     }
 
     throw new BadRequestError('Invalid action specified');
-  } catch (err) {
+  } catch (err: any) {
+    console.error('[Admin Cooks API] Error updating cook status:', {
+      message: err?.message || String(err),
+      stack: err?.stack,
+    });
     return errorResponse(err);
   }
 }
+

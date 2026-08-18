@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticateAdminRequest, checkAdminPermission } from '@/middleware/admin-auth';
 import { adminRepository } from '@/repositories/admin.repository';
 import { successResponse, errorResponse } from '@/lib/api-response';
@@ -10,13 +10,18 @@ export async function GET() {
     const adminUser = await authenticateAdminRequest();
     checkAdminPermission(adminUser, 'view_data');
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
+    console.info(`[Admin Settings API] Fetching settings for admin: ${adminUser.id}`);
     const [citiesRes, servicesRes, adminUsersRes] = await Promise.all([
       supabase.from('cities').select('*').order('name'),
       supabase.from('services').select('*').order('name'),
       supabase.from('admin_users').select('*, profile:profiles(full_name, email)'),
     ]);
+
+    if (citiesRes.error) console.error('[Admin Settings API] Error fetching cities:', citiesRes.error);
+    if (servicesRes.error) console.error('[Admin Settings API] Error fetching services:', servicesRes.error);
+    if (adminUsersRes.error) console.error('[Admin Settings API] Error fetching admin_users:', adminUsersRes.error);
 
     // System configuration state
     const systemConfig = {
@@ -39,7 +44,11 @@ export async function GET() {
       adminUsers: adminUsersRes.data || [],
       systemConfig,
     });
-  } catch (err) {
+  } catch (err: any) {
+    console.error('[Admin Settings API] Error loading settings:', {
+      message: err?.message || String(err),
+      stack: err?.stack,
+    });
     return errorResponse(err);
   }
 }
@@ -49,7 +58,7 @@ export async function POST(req: NextRequest) {
     const adminUser = await authenticateAdminRequest();
     checkAdminPermission(adminUser, 'modify_settings');
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const body = await req.json();
 
     const { action, payload } = body;
@@ -105,7 +114,12 @@ export async function POST(req: NextRequest) {
     }
 
     throw new BadRequestError('Invalid settings action');
-  } catch (err) {
+  } catch (err: any) {
+    console.error('[Admin Settings API] Error updating settings:', {
+      message: err?.message || String(err),
+      stack: err?.stack,
+    });
     return errorResponse(err);
   }
 }
+

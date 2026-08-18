@@ -36,9 +36,20 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'fk_bookings_customer') THEN
     ALTER TABLE bookings ADD CONSTRAINT fk_bookings_customer FOREIGN KEY (customer_id) REFERENCES profiles(id) ON DELETE RESTRICT;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'fk_bookings_cook') THEN
-    ALTER TABLE bookings ADD CONSTRAINT fk_bookings_cook FOREIGN KEY (cook_id) REFERENCES profiles(id) ON DELETE SET NULL;
+  
+  -- Ensure fk_bookings_cook references cooks(id) (not profiles(id))
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints tc 
+    JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
+    WHERE tc.constraint_name = 'fk_bookings_cook' AND ccu.table_name = 'profiles'
+  ) THEN
+    ALTER TABLE bookings DROP CONSTRAINT fk_bookings_cook;
   END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'fk_bookings_cook') THEN
+    ALTER TABLE bookings ADD CONSTRAINT fk_bookings_cook FOREIGN KEY (cook_id) REFERENCES cooks(id) ON DELETE SET NULL;
+  END IF;
+
   IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'fk_bookings_service') THEN
     ALTER TABLE bookings ADD CONSTRAINT fk_bookings_service FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE RESTRICT;
   END IF;
@@ -170,12 +181,12 @@ CREATE OR REPLACE FUNCTION is_admin(user_id uuid)
 RETURNS boolean AS $$
 BEGIN
   RETURN EXISTS (
-    SELECT 1 FROM admin_users WHERE profile_id = user_id
+    SELECT 1 FROM public.admin_users WHERE profile_id = user_id
   ) OR EXISTS (
-    SELECT 1 FROM profiles WHERE id = user_id AND role = 'admin'
+    SELECT 1 FROM public.profiles WHERE id = user_id AND role = 'admin'
   );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- Profiles Policies
 DROP POLICY IF EXISTS "Users can view own profile" ON profiles;

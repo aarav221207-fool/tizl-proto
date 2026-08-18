@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticateAdminRequest, checkAdminPermission, AdminDesignation } from '@/middleware/admin-auth';
 import { adminRepository } from '@/repositories/admin.repository';
 import { successResponse, errorResponse } from '@/lib/api-response';
@@ -14,7 +14,7 @@ export async function PATCH(
     const adminUser = await authenticateAdminRequest();
     checkAdminPermission(adminUser, 'manage_admins');
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const body = await req.json();
 
     const { designation, status } = body;
@@ -24,7 +24,7 @@ export async function PATCH(
       .from('admin_users')
       .select('*, profile:profiles(id, email, full_name)')
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
     if (fetchError || !targetAdmin) {
       throw new NotFoundError('Admin user record not found');
@@ -124,7 +124,11 @@ export async function PATCH(
     return successResponse({
       message: 'Admin user permissions updated successfully',
     });
-  } catch (err) {
+  } catch (err: any) {
+    console.error('[Admin Admin User Update API] Error:', {
+      message: err?.message || String(err),
+      stack: err?.stack,
+    });
     return errorResponse(err);
   }
 }
@@ -138,14 +142,14 @@ export async function DELETE(
     const adminUser = await authenticateAdminRequest();
     checkAdminPermission(adminUser, 'manage_admins');
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Fetch existing admin user record
     const { data: targetAdmin, error: fetchError } = await supabase
       .from('admin_users')
       .select('*, profile:profiles(id, email)')
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
     if (fetchError || !targetAdmin) {
       throw new NotFoundError('Admin user record not found');
@@ -192,7 +196,12 @@ export async function DELETE(
     return successResponse({
       message: 'Admin privileges removed successfully',
     });
-  } catch (err) {
+  } catch (err: any) {
+    console.error('[Admin Admin User Delete API] Error:', {
+      message: err?.message || String(err),
+      stack: err?.stack,
+    });
     return errorResponse(err);
   }
 }
+

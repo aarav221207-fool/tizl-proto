@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticateAdminRequest, checkAdminPermission } from '@/middleware/admin-auth';
 import { adminService } from '@/services/admin.service';
 import { successResponse, errorResponse } from '@/lib/api-response';
@@ -10,11 +10,16 @@ export async function GET() {
     const adminUser = await authenticateAdminRequest();
     checkAdminPermission(adminUser, 'view_data');
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
+    console.info(`[Admin Customers API] Fetching customers for admin: ${adminUser.id}`);
     const customers = await adminService.listAllCustomersAdmin(supabase, adminUser.id);
-    return successResponse({ customers });
-  } catch (err) {
+    return successResponse({ customers: customers || [] });
+  } catch (err: any) {
+    console.error('[Admin Customers API] Error loading customers:', {
+      message: err?.message || String(err),
+      stack: err?.stack,
+    });
     return errorResponse(err);
   }
 }
@@ -24,7 +29,7 @@ export async function POST(req: NextRequest) {
     const adminUser = await authenticateAdminRequest();
     checkAdminPermission(adminUser, 'manage_customers');
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const body = await req.json();
 
     const { customer_id, status, reason } = body;
@@ -41,7 +46,12 @@ export async function POST(req: NextRequest) {
     );
 
     return successResponse({ customer: updated });
-  } catch (err) {
+  } catch (err: any) {
+    console.error('[Admin Customers API] Error updating customer status:', {
+      message: err?.message || String(err),
+      stack: err?.stack,
+    });
     return errorResponse(err);
   }
 }
+
