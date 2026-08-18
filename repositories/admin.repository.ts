@@ -82,7 +82,8 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
       'APPROVE_COOK_VERIFICATION',
       cookId,
       null,
-      { is_approved: true, verification_status: 'verified' }
+      { is_approved: true, verification_status: 'verified' },
+      'cooks'
     );
 
     return updated.data;
@@ -94,12 +95,13 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
     action: string,
     recordId: string | null,
     oldData?: Record<string, unknown> | null,
-    newData?: Record<string, unknown> | null
+    newData?: Record<string, unknown> | null,
+    tableName: string = 'admin_users'
   ) {
     await client.from('audit_logs').insert({
       profile_id: profileId,
       action,
-      table_name: this.tableName,
+      table_name: tableName,
       record_id: recordId || null,
       old_data: oldData || null,
       new_data: newData || null,
@@ -202,12 +204,12 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
 
     // In-memory join for cooks and cook profiles
     const cooks = cooksProfiles.map((profile) => {
-      const details = cooksList.filter(
+      const details = cooksList.find(
         (d) => d.id === profile.id || d.profile_id === profile.id
       );
       return {
         ...profile,
-        cook_details: details.length > 0 ? details[0] : null,
+        cook_details: details || null,
       };
     });
 
@@ -223,17 +225,14 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
       0
     );
 
-    // Cooks metrics
+    // Cooks metrics using cooks.is_approved, cooks.verification_status, cooks.is_available
     const activeCooks = cooks.filter((c) => {
-      const details = Array.isArray(c.cook_details) ? c.cook_details[0] : c.cook_details;
-      const isApproved =
-        typeof details === 'object' && details !== null && 'is_approved' in details
-          ? (details as { is_approved: boolean | null }).is_approved
-          : false;
+      const details = c.cook_details;
+      const isApproved = details?.is_approved === true || details?.verification_status === 'verified';
       return isApproved || c.status === 'active';
     }).length;
     const onlineCooks = cooks.filter(
-      (c) => c.status === 'active' || c.status === 'online'
+      (c) => c.cook_details?.is_available === true || c.status === 'active' || c.status === 'online'
     ).length;
 
     // Funnel breakdown

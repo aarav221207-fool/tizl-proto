@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { authenticateAdminRequest, checkAdminPermission } from '@/middleware/admin-auth';
 import { adminService } from '@/services/admin.service';
+import { analyticsService } from '@/services/analytics.service';
 import { successResponse, errorResponse } from '@/lib/api-response';
 
 export async function GET(req: NextRequest) {
@@ -11,10 +12,9 @@ export async function GET(req: NextRequest) {
 
     const supabase = await createClient();
 
-    const metrics = await adminService.getDashboardMetrics(supabase, adminUser.id);
-
-    // Supplementary analytics calculations
-    const [bookingsRes, paymentsRes] = await Promise.all([
+    const [metrics, visitorAnalytics, bookingsRes, paymentsRes] = await Promise.all([
+      adminService.getDashboardMetrics(supabase, adminUser.id),
+      analyticsService.getVisitorMetrics(supabase, 30),
       supabase.from('bookings').select('*, service:services(name), address:addresses(city:cities(name))'),
       supabase.from('payments').select('*'),
     ]);
@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
     return successResponse({
       analytics: {
         ...metrics,
+        visitorAnalytics,
         financials: {
           grossRevenue: totalGrossRevenue,
           platformFees: totalPlatformFees,

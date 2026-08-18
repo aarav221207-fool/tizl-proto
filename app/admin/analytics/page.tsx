@@ -15,7 +15,25 @@ import {
   Layers,
   ArrowUpRight,
   Filter,
+  Globe,
+  Eye,
+  Smartphone,
+  Laptop,
+  Compass,
+  UserCheck,
+  UserX,
 } from 'lucide-react';
+
+interface VisitorAnalytics {
+  totalPageViews: number;
+  uniqueVisitors: number;
+  authenticatedVisitors: number;
+  anonymousVisitors: number;
+  dailyTraffic: { date: string; views: number; uniqueVisitors: number }[];
+  topPages: { path: string; count: number }[];
+  deviceBreakdown: Record<string, number>;
+  topReferrers: { referrer: string; count: number }[];
+}
 
 interface AnalyticsData {
   totalRevenue: number;
@@ -27,6 +45,7 @@ interface AnalyticsData {
   topServices: { name: string; count: number; revenue: number }[];
   topCities: { name: string; count: number }[];
   dailyTrends: { date: string; bookings: number; revenue: number }[];
+  visitorAnalytics?: VisitorAnalytics;
   financials: {
     grossRevenue: number;
     platformFees: number;
@@ -228,6 +247,191 @@ export default function AdminAnalyticsPage() {
               </div>
             </div>
           </div>
+
+          {/* Website Traffic & Visitor Intelligence */}
+          {data.visitorAnalytics && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-indigo-400" />
+                    Website Traffic & Visitor Intelligence
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Real-time page views, unique session tracking, and anonymous vs. logged-in audience telemetry from Supabase.
+                  </p>
+                </div>
+              </div>
+
+              {/* Traffic Key Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-400 font-medium">Total Page Views</span>
+                    <Eye className="w-4 h-4 text-indigo-400" />
+                  </div>
+                  <div className="text-2xl font-extrabold text-white mt-2">
+                    {data.visitorAnalytics.totalPageViews.toLocaleString()}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">Recorded in analytics_events</div>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-400 font-medium">Unique Visitors</span>
+                    <Users className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div className="text-2xl font-extrabold text-emerald-400 mt-2">
+                    {data.visitorAnalytics.uniqueVisitors.toLocaleString()}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">Distinct session & user IDs</div>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-400 font-medium">Logged-in Users</span>
+                    <UserCheck className="w-4 h-4 text-blue-400" />
+                  </div>
+                  <div className="text-2xl font-extrabold text-blue-400 mt-2">
+                    {data.visitorAnalytics.authenticatedVisitors.toLocaleString()}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">Associated with profile IDs</div>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-400 font-medium">Anonymous Visitors</span>
+                    <UserX className="w-4 h-4 text-purple-400" />
+                  </div>
+                  <div className="text-2xl font-extrabold text-purple-400 mt-2">
+                    {data.visitorAnalytics.anonymousVisitors.toLocaleString()}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">Guest & unauthenticated sessions</div>
+                </div>
+              </div>
+
+              {/* Traffic Trends & Breakdown */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Daily Visitor Volume */}
+                <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-indigo-400" />
+                      Daily Page Views & Visitor Volume (Last 14 Days)
+                    </h3>
+                  </div>
+
+                  {data.visitorAnalytics.dailyTraffic.length === 0 ? (
+                    <p className="text-xs text-slate-500 py-6 text-center">No visitor traffic recorded yet.</p>
+                  ) : (
+                    <div className="space-y-3 pt-2">
+                      {data.visitorAnalytics.dailyTraffic.map((day) => {
+                        const maxViews = Math.max(...data.visitorAnalytics!.dailyTraffic.map((d) => d.views), 1);
+                        const percentage = Math.round((day.views / maxViews) * 100);
+                        return (
+                          <div key={day.date} className="space-y-1.5">
+                            <div className="flex justify-between text-xs font-semibold">
+                              <span className="text-slate-300">{day.date}</span>
+                              <div className="space-x-3">
+                                <span className="text-indigo-400 font-mono">{day.views} Views</span>
+                                <span className="text-slate-400">{day.uniqueVisitors} Unique</span>
+                              </div>
+                            </div>
+                            <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden flex">
+                              <div
+                                className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Device & Referrer Breakdown */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5">
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
+                      <Smartphone className="w-4 h-4 text-emerald-400" />
+                      Device Distribution
+                    </h3>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
+                        <div className="text-[11px] text-slate-400">Mobile</div>
+                        <div className="text-base font-bold text-white mt-1">
+                          {data.visitorAnalytics.deviceBreakdown.mobile || 0}
+                        </div>
+                      </div>
+                      <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
+                        <div className="text-[11px] text-slate-400">Desktop</div>
+                        <div className="text-base font-bold text-white mt-1">
+                          {data.visitorAnalytics.deviceBreakdown.desktop || 0}
+                        </div>
+                      </div>
+                      <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
+                        <div className="text-[11px] text-slate-400">Tablet</div>
+                        <div className="text-base font-bold text-white mt-1">
+                          {data.visitorAnalytics.deviceBreakdown.tablet || 0}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
+                      <Compass className="w-4 h-4 text-amber-400" />
+                      Top Traffic Sources
+                    </h3>
+                    <div className="space-y-2">
+                      {data.visitorAnalytics.topReferrers.length === 0 ? (
+                        <p className="text-xs text-slate-500">No external referrers logged.</p>
+                      ) : (
+                        data.visitorAnalytics.topReferrers.map((ref) => (
+                          <div
+                            key={ref.referrer}
+                            className="flex justify-between items-center text-xs p-2 bg-slate-950 rounded border border-slate-800/80"
+                          >
+                            <span className="text-slate-300 truncate max-w-[160px]">{ref.referrer}</span>
+                            <span className="font-mono text-emerald-400 font-bold">{ref.count} visits</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Top Visited Pages */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-blue-400" />
+                  Most Viewed Pages
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {data.visitorAnalytics.topPages.length === 0 ? (
+                    <p className="text-xs text-slate-500 col-span-full">No page views recorded yet.</p>
+                  ) : (
+                    data.visitorAnalytics.topPages.map((page, idx) => (
+                      <div
+                        key={page.path}
+                        className="p-3 bg-slate-950 border border-slate-800 rounded-lg flex items-center justify-between text-xs"
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <span className="w-5 h-5 rounded bg-slate-800 text-slate-400 flex items-center justify-center text-[10px] font-bold shrink-0">
+                            #{idx + 1}
+                          </span>
+                          <span className="font-mono text-slate-200 truncate">{page.path}</span>
+                        </div>
+                        <span className="font-mono font-bold text-indigo-400 ml-2 shrink-0">{page.count}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Top Services & Top Cities */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

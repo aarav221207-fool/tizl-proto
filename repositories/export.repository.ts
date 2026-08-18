@@ -44,7 +44,6 @@ export class ExportRepository extends BaseRepository<'bookings'> {
         total_amount,
         created_at,
         customer:profiles!customer_id(full_name, phone, email),
-        cook:profiles!cook_id(full_name, phone),
         service:services(name, category),
         address:addresses(house_number, street, locality, pincode, city_id)
       `)
@@ -57,9 +56,35 @@ export class ExportRepository extends BaseRepository<'bookings'> {
     if (filters.cookId) query = query.eq('cook_id', filters.cookId);
     if (filters.serviceId) query = query.eq('service_id', filters.serviceId);
 
-    const { data, error } = await query;
+    const { data: rawBookings, error } = await query;
     if (error) throw error;
-    return data || [];
+    if (!rawBookings || rawBookings.length === 0) return [];
+
+    // Batch resolve cooks: bookings.cook_id -> cooks.id -> cooks.profile_id -> profiles.id
+    const cookIds = Array.from(new Set(rawBookings.map((b) => b.cook_id).filter(Boolean))) as string[];
+    const cookMap = new Map<string, { full_name: string | null; phone: string | null }>();
+
+    if (cookIds.length > 0) {
+      const { data: cooks } = await client.from('cooks').select('id, profile_id, display_name').in('id', cookIds);
+      if (cooks && cooks.length > 0) {
+        const profileIds = cooks.map((c) => c.profile_id).filter(Boolean);
+        const { data: profiles } = await client.from('profiles').select('id, full_name, phone').in('id', profileIds);
+        const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+
+        cooks.forEach((c) => {
+          const prof = profileMap.get(c.profile_id);
+          cookMap.set(c.id, {
+            full_name: prof?.full_name || c.display_name || 'Cook Partner',
+            phone: prof?.phone || null,
+          });
+        });
+      }
+    }
+
+    return rawBookings.map((b) => ({
+      ...b,
+      cook: b.cook_id ? cookMap.get(b.cook_id) || null : null,
+    }));
   }
 
   /**
@@ -113,7 +138,7 @@ export class ExportRepository extends BaseRepository<'bookings'> {
 
     return profiles.map((p) => {
       const details = cooksList.find(
-        (c) => c.id === p.id || c.profile_id === p.id
+        (c) => c.profile_id === p.id || c.id === p.id
       );
       return {
         ...p,
@@ -168,8 +193,7 @@ export class ExportRepository extends BaseRepository<'bookings'> {
         rating,
         comment,
         created_at,
-        customer:profiles!customer_id(full_name),
-        cook:profiles!cook_id(full_name)
+        customer:profiles!customer_id(full_name)
       `)
       .order('created_at', { ascending: false });
 
@@ -178,9 +202,34 @@ export class ExportRepository extends BaseRepository<'bookings'> {
     if (filters.customerId) query = query.eq('customer_id', filters.customerId);
     if (filters.cookId) query = query.eq('cook_id', filters.cookId);
 
-    const { data, error } = await query;
+    const { data: rawReviews, error } = await query;
     if (error) throw error;
-    return data || [];
+    if (!rawReviews || rawReviews.length === 0) return [];
+
+    // Batch resolve cooks: reviews.cook_id -> cooks.id -> cooks.profile_id -> profiles.id
+    const cookIds = Array.from(new Set(rawReviews.map((r) => r.cook_id).filter(Boolean))) as string[];
+    const cookMap = new Map<string, { full_name: string | null }>();
+
+    if (cookIds.length > 0) {
+      const { data: cooks } = await client.from('cooks').select('id, profile_id, display_name').in('id', cookIds);
+      if (cooks && cooks.length > 0) {
+        const profileIds = cooks.map((c) => c.profile_id).filter(Boolean);
+        const { data: profiles } = await client.from('profiles').select('id, full_name').in('id', profileIds);
+        const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+
+        cooks.forEach((c) => {
+          const prof = profileMap.get(c.profile_id);
+          cookMap.set(c.id, {
+            full_name: prof?.full_name || c.display_name || 'Cook Partner',
+          });
+        });
+      }
+    }
+
+    return rawReviews.map((r) => ({
+      ...r,
+      cook: r.cook_id ? cookMap.get(r.cook_id) || null : null,
+    }));
   }
 
   /**

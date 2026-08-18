@@ -105,13 +105,13 @@ export class CustomersRepository extends BaseRepository<'profiles'> {
         client.from('customer_details').select('*').eq('customer_id', customerId).maybeSingle(),
         client
           .from('bookings')
-          .select('*, service:services(name, category), cook:profiles!cook_id(full_name, phone)')
+          .select('*, service:services(name, category)')
           .eq('customer_id', customerId)
           .order('created_at', { ascending: false }),
         client.from('addresses').select('*, city:cities(name)').eq('customer_id', customerId),
         client
           .from('reviews')
-          .select('*, cook:profiles!cook_id(full_name)')
+          .select('*')
           .eq('customer_id', customerId)
           .order('created_at', { ascending: false }),
         client
@@ -125,10 +125,55 @@ export class CustomersRepository extends BaseRepository<'profiles'> {
 
     const profile = profileRes.data;
     const details = detailsRes.data || null;
-    const bookings = bookingsRes.data || [];
+    const rawBookings = bookingsRes.data || [];
     const addresses = addressesRes.data || [];
-    const reviews = reviewsRes.data || [];
+    const rawReviews = reviewsRes.data || [];
     const auditLogs = auditRes.data || [];
+
+    // Collect all cook IDs referenced in bookings and reviews (cook_id -> cooks.id)
+    const allCookIds = Array.from(
+      new Set([
+        ...rawBookings.map((b) => b.cook_id).filter(Boolean),
+        ...rawReviews.map((r) => r.cook_id).filter(Boolean),
+      ])
+    ) as string[];
+
+    const cookInfoMap = new Map<string, { full_name: string | null; phone: string | null }>();
+
+    if (allCookIds.length > 0) {
+      const { data: cooks } = await client
+        .from('cooks')
+        .select('id, profile_id, display_name')
+        .in('id', allCookIds);
+
+      if (cooks && cooks.length > 0) {
+        const profileIds = cooks.map((c) => c.profile_id).filter(Boolean);
+        const { data: cookProfiles } = await client
+          .from('profiles')
+          .select('id, full_name, phone')
+          .in('id', profileIds);
+
+        const profileMap = new Map((cookProfiles || []).map((p) => [p.id, p]));
+
+        cooks.forEach((c) => {
+          const p = profileMap.get(c.profile_id);
+          cookInfoMap.set(c.id, {
+            full_name: p?.full_name || c.display_name || 'Cook Partner',
+            phone: p?.phone || null,
+          });
+        });
+      }
+    }
+
+    const bookings = rawBookings.map((b) => ({
+      ...b,
+      cook: b.cook_id ? cookInfoMap.get(b.cook_id) || null : null,
+    }));
+
+    const reviews = rawReviews.map((r) => ({
+      ...r,
+      cook: r.cook_id ? cookInfoMap.get(r.cook_id) || null : null,
+    }));
 
     const activeBookings = bookings.filter((b) =>
       ['pending_confirmation', 'searching', 'accepted', 'cook_arriving', 'cooking'].includes(b.status)

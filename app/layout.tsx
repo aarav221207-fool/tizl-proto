@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import './globals.css';
 import { AuthProvider } from '@/context/auth-context';
+import { AnalyticsTracker } from '@/components/analytics-tracker';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://tizl.in'),
@@ -27,7 +29,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body suppressHydrationWarning>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <Suspense fallback={null}>
+            <AnalyticsTracker />
+          </Suspense>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

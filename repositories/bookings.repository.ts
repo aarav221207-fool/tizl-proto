@@ -43,14 +43,13 @@ export class BookingsRepository extends BaseRepository<'bookings'> {
   }
 
   async getBookingById(client: SupabaseClient<Database>, bookingId: string) {
-    const { data, error } = await client
+    const { data: booking, error } = await client
       .from('bookings')
       .select(`
         *,
         services (*),
         addresses (*),
         customer:profiles!customer_id (*),
-        cook:profiles!cook_id (*),
         booking_timeline (*),
         booking_history (*),
         booking_cancellations (*)
@@ -59,40 +58,152 @@ export class BookingsRepository extends BaseRepository<'bookings'> {
       .single();
 
     if (error) throw error;
-    return data;
+    if (!booking) return null;
+
+    // Resolve cook relationship: bookings.cook_id -> cooks.id -> cooks.profile_id -> profiles.id
+    let cookData: {
+      id: string;
+      full_name: string | null;
+      phone: string | null;
+      email: string | null;
+      avatar_url: string | null;
+      display_name: string | null;
+      hourly_rate: number | null;
+      is_approved: boolean | null;
+      verification_status: string | null;
+    } | null = null;
+
+    if (booking.cook_id) {
+      const { data: cookRecord } = await client
+        .from('cooks')
+        .select('*')
+        .eq('id', booking.cook_id)
+        .maybeSingle();
+
+      if (cookRecord) {
+        const { data: cookProfile } = await client
+          .from('profiles')
+          .select('*')
+          .eq('id', cookRecord.profile_id)
+          .maybeSingle();
+
+        cookData = {
+          id: cookRecord.id,
+          full_name: cookProfile?.full_name || cookRecord.display_name || 'Cook Partner',
+          phone: cookProfile?.phone || null,
+          email: cookProfile?.email || null,
+          avatar_url: cookProfile?.avatar_url || null,
+          display_name: cookRecord.display_name,
+          hourly_rate: cookRecord.hourly_rate,
+          is_approved: cookRecord.is_approved,
+          verification_status: cookRecord.verification_status,
+        };
+      }
+    }
+
+    return {
+      ...booking,
+      cook: cookData,
+    };
   }
 
   async getCustomerBookings(client: SupabaseClient<Database>, customerId: string) {
-    const { data, error } = await client
+    const { data: bookings, error } = await client
       .from('bookings')
-      .select('*, services(*), addresses(*), cook:profiles!cook_id(full_name, phone, avatar_url)')
+      .select('*, services(*), addresses(*)')
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    if (!bookings || bookings.length === 0) return [];
+
+    // Batch resolve cooks
+    const cookIds = Array.from(new Set(bookings.map((b) => b.cook_id).filter(Boolean))) as string[];
+    const cookMap = new Map<string, { full_name: string | null; phone: string | null; avatar_url: string | null }>();
+
+    if (cookIds.length > 0) {
+      const { data: cooks } = await client.from('cooks').select('id, profile_id, display_name').in('id', cookIds);
+      if (cooks && cooks.length > 0) {
+        const profileIds = cooks.map((c) => c.profile_id).filter(Boolean);
+        const { data: profiles } = await client.from('profiles').select('id, full_name, phone, avatar_url').in('id', profileIds);
+        const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+
+        cooks.forEach((c) => {
+          const prof = profileMap.get(c.profile_id);
+          cookMap.set(c.id, {
+            full_name: prof?.full_name || c.display_name || 'Cook Partner',
+            phone: prof?.phone || null,
+            avatar_url: prof?.avatar_url || null,
+          });
+        });
+      }
+    }
+
+    return bookings.map((b) => ({
+      ...b,
+      cook: b.cook_id ? cookMap.get(b.cook_id) || null : null,
+    }));
   }
 
-  async getCookBookings(client: SupabaseClient<Database>, cookId: string) {
-    const { data, error } = await client
+  async getCookBookings(client: SupabaseClient<Database>, cookIdOrProfileId: string) {
+    // Resolve actual cooks.id
+    let actualCookId = cookIdOrProfileId;
+    const { data: cookRecord } = await client
+      .from('cooks')
+      .select('id')
+      .or(`id.eq.${cookIdOrProfileId},profile_id.eq.${cookIdOrProfileId}`)
+      .maybeSingle();
+
+    if (cookRecord) {
+      actualCookId = cookRecord.id;
+    }
+
+    const { data: bookings, error } = await client
       .from('bookings')
       .select('*, services(*), addresses(*), customer:profiles!customer_id(full_name, phone)')
-      .eq('cook_id', cookId)
+      .eq('cook_id', actualCookId)
       .order('booking_date', { ascending: true });
 
     if (error) throw error;
-    return data || [];
+    return bookings || [];
   }
 
   async listRecentBookings(client: SupabaseClient<Database>, limit = 50) {
-    const { data, error } = await client
+    const { data: bookings, error } = await client
       .from('bookings')
-      .select('*, services(*), addresses(*), customer:profiles!customer_id(full_name, phone, email), cook:profiles!cook_id(full_name, phone)')
+      .select('*, services(*), addresses(*), customer:profiles!customer_id(full_name, phone, email)')
       .order('created_at', { ascending: false })
       .limit(limit);
 
     if (error) throw error;
-    return data || [];
+    if (!bookings || bookings.length === 0) return [];
+
+    // Batch resolve cooks
+    const cookIds = Array.from(new Set(bookings.map((b) => b.cook_id).filter(Boolean))) as string[];
+    const cookMap = new Map<string, { id: string; full_name: string | null; phone: string | null }>();
+
+    if (cookIds.length > 0) {
+      const { data: cooks } = await client.from('cooks').select('id, profile_id, display_name').in('id', cookIds);
+      if (cooks && cooks.length > 0) {
+        const profileIds = cooks.map((c) => c.profile_id).filter(Boolean);
+        const { data: profiles } = await client.from('profiles').select('id, full_name, phone').in('id', profileIds);
+        const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+
+        cooks.forEach((c) => {
+          const prof = profileMap.get(c.profile_id);
+          cookMap.set(c.id, {
+            id: c.id,
+            full_name: prof?.full_name || c.display_name || 'Cook Partner',
+            phone: prof?.phone || null,
+          });
+        });
+      }
+    }
+
+    return bookings.map((b) => ({
+      ...b,
+      cook: b.cook_id ? cookMap.get(b.cook_id) || null : null,
+    }));
   }
 
   async updateBookingStatus(

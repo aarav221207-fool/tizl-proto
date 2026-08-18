@@ -222,6 +222,18 @@ export class AdminService {
     const booking = await bookingsRepository.getBookingById(client, bookingId);
     if (!booking) throw new NotFoundError('Booking not found');
 
+    // Ensure cookId stores cooks.id (not profiles.id)
+    let actualCookId = cookId;
+    const { data: cookRecord } = await client
+      .from('cooks')
+      .select('id')
+      .or(`id.eq.${cookId},profile_id.eq.${cookId}`)
+      .maybeSingle();
+
+    if (cookRecord) {
+      actualCookId = cookRecord.id;
+    }
+
     const oldCookId = booking.cook_id;
     const updated = await bookingsRepository.updateBookingStatus(
       client,
@@ -229,7 +241,7 @@ export class AdminService {
       'cook_assigned',
       adminUserId,
       `Cook assigned by admin`,
-      { cook_id: cookId }
+      { cook_id: actualCookId }
     );
 
     await adminRepository.recordAuditLog(
@@ -238,7 +250,7 @@ export class AdminService {
       'ASSIGN_COOK',
       bookingId,
       { cook_id: oldCookId },
-      { cook_id: cookId }
+      { cook_id: actualCookId }
     );
 
     return updated;

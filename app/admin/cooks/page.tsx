@@ -54,10 +54,6 @@ interface Cook {
     verification_status?: string | null;
     is_approved?: boolean | null;
     is_available?: boolean | null;
-    is_verified?: boolean;
-    police_verification_status?: string;
-    aadhaar_number?: string | null;
-    bank_details?: Record<string, any> | null;
   } | null;
   stats: {
     totalBookings: number;

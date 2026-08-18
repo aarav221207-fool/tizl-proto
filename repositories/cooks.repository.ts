@@ -48,7 +48,7 @@ export class CooksRepository extends BaseRepository<'cooks'> {
     const bookings = bookingsRes.data || [];
     const reviews = reviewsRes.data || [];
 
-    // Aggregate booking stats per cook
+    // Aggregate booking stats per cook (using bookings.cook_id -> cooks.id)
     const cookStatsMap = new Map<
       string,
       { totalBookings: number; completedBookings: number; totalEarnings: number }
@@ -69,7 +69,7 @@ export class CooksRepository extends BaseRepository<'cooks'> {
       cookStatsMap.set(b.cook_id, curr);
     });
 
-    // Aggregate review rating per cook
+    // Aggregate review rating per cook (using reviews.cook_id -> cooks.id)
     const cookRatingMap = new Map<string, { totalRatings: number; sumRatings: number }>();
     reviews.forEach((r) => {
       if (!r.cook_id) return;
@@ -80,18 +80,19 @@ export class CooksRepository extends BaseRepository<'cooks'> {
     });
 
     return profiles.map((p) => {
-      const stats = cookStatsMap.get(p.id) || {
+      const details = cooksList.find(
+        (c) => c.profile_id === p.id || c.id === p.id
+      ) || null;
+
+      // Look up stats by cooks.id first, then fallback to p.id
+      const actualCookId = details?.id || p.id;
+      const stats = cookStatsMap.get(actualCookId) || cookStatsMap.get(p.id) || {
         totalBookings: 0,
         completedBookings: 0,
         totalEarnings: 0,
       };
-      const rating = cookRatingMap.get(p.id);
+      const rating = cookRatingMap.get(actualCookId) || cookRatingMap.get(p.id);
       const avgRating = rating && rating.totalRatings > 0 ? rating.sumRatings / rating.totalRatings : 0;
-      
-      const detailsArr = cooksList.filter(
-        (c) => c.id === p.id || c.profile_id === p.id
-      );
-      const details = detailsArr.length > 0 ? detailsArr[0] : null;
 
       return {
         ...p,
@@ -107,33 +108,47 @@ export class CooksRepository extends BaseRepository<'cooks'> {
     });
   }
 
-  async getCookFullProfileAdmin(client: SupabaseClient<Database>, cookId: string) {
-    const [profileRes, cooksRes, bookingsRes, reviewsRes, auditRes, docsRes, availRes] = await Promise.all([
-      client.from('profiles').select('*').eq('id', cookId).single(),
-      client.from('cooks').select('*').or(`id.eq.${cookId},profile_id.eq.${cookId}`).maybeSingle(),
+  async getCookFullProfileAdmin(client: SupabaseClient<Database>, cookIdOrProfileId: string) {
+    // 1. Resolve cook record & profile record
+    const { data: cookRecord } = await client
+      .from('cooks')
+      .select('*')
+      .or(`id.eq.${cookIdOrProfileId},profile_id.eq.${cookIdOrProfileId}`)
+      .maybeSingle();
+
+    const targetProfileId = cookRecord?.profile_id || cookIdOrProfileId;
+    const targetCookId = cookRecord?.id || cookIdOrProfileId;
+
+    const { data: profileRecord, error: profileError } = await client
+      .from('profiles')
+      .select('*')
+      .eq('id', targetProfileId)
+      .single();
+
+    if (profileError || !profileRecord) {
+      throw profileError || new Error('Cook profile not found');
+    }
+
+    const [bookingsRes, reviewsRes, auditRes, docsRes, availRes] = await Promise.all([
       client
         .from('bookings')
         .select('*, service:services(name, category), customer:profiles!customer_id(full_name, phone)')
-        .eq('cook_id', cookId)
+        .eq('cook_id', targetCookId)
         .order('created_at', { ascending: false }),
       client
         .from('reviews')
         .select('*, customer:profiles!customer_id(full_name)')
-        .eq('cook_id', cookId)
+        .eq('cook_id', targetCookId)
         .order('created_at', { ascending: false }),
       client
         .from('audit_logs')
         .select('*')
-        .eq('record_id', cookId)
+        .or(`record_id.eq.${targetCookId},record_id.eq.${targetProfileId}`)
         .order('created_at', { ascending: false }),
-      client.from('cook_documents').select('*').eq('cook_id', cookId),
-      client.from('cook_availability').select('*').eq('cook_id', cookId),
+      client.from('cook_documents').select('*').eq('cook_id', targetCookId),
+      client.from('cook_availability').select('*').eq('cook_id', targetCookId),
     ]);
 
-    if (profileRes.error) throw profileRes.error;
-
-    const profile = profileRes.data;
-    const details = cooksRes.data || null;
     const bookings = bookingsRes.data || [];
     const reviews = reviewsRes.data || [];
     const auditLogs = auditRes.data || [];
@@ -148,8 +163,8 @@ export class CooksRepository extends BaseRepository<'cooks'> {
         : 0;
 
     return {
-      profile,
-      details,
+      profile: profileRecord,
+      details: cookRecord || null,
       documents,
       availability,
       bookings,
@@ -167,7 +182,7 @@ export class CooksRepository extends BaseRepository<'cooks'> {
 
   async updateVerificationStatus(
     client: SupabaseClient<Database>,
-    cookId: string,
+    cookIdOrProfileId: string,
     isApproved: boolean,
     verificationStatus: string = 'verified'
   ) {
@@ -178,7 +193,7 @@ export class CooksRepository extends BaseRepository<'cooks'> {
         verification_status: verificationStatus,
         updated_at: new Date().toISOString(),
       })
-      .or(`id.eq.${cookId},profile_id.eq.${cookId}`)
+      .or(`id.eq.${cookIdOrProfileId},profile_id.eq.${cookIdOrProfileId}`)
       .select()
       .maybeSingle();
 
@@ -188,16 +203,28 @@ export class CooksRepository extends BaseRepository<'cooks'> {
 
   async updateProfileStatus(
     client: SupabaseClient<Database>,
-    cookId: string,
+    cookIdOrProfileId: string,
     status: 'active' | 'inactive' | 'suspended' | 'rejected' | 'pending'
   ) {
+    // If given a cooks.id, resolve to profile_id
+    let profileId = cookIdOrProfileId;
+    const { data: cook } = await client
+      .from('cooks')
+      .select('profile_id')
+      .or(`id.eq.${cookIdOrProfileId},profile_id.eq.${cookIdOrProfileId}`)
+      .maybeSingle();
+
+    if (cook?.profile_id) {
+      profileId = cook.profile_id;
+    }
+
     const { data, error } = await client
       .from('profiles')
       .update({
         status,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', cookId)
+      .eq('id', profileId)
       .select()
       .single();
 
