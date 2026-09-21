@@ -151,7 +151,10 @@ export default function AdminBookingsPage() {
     setError(null);
     try {
       const res = await fetch('/api/admin/bookings');
-      if (!res.ok) throw new Error('Failed to load bookings');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error?.message || 'Failed to load bookings');
+      }
       const data = await res.json();
       setBookings(data.data?.bookings || []);
       setCooks(data.data?.cooks || []);
@@ -194,7 +197,10 @@ export default function AdminBookingsPage() {
     setActionSuccessMsg(null);
     try {
       const res = await fetch(`/api/admin/bookings/${id}`);
-      if (!res.ok) throw new Error('Failed to fetch details');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error?.message || 'Failed to fetch details');
+      }
       const data = await res.json();
       setDetailedBooking(data.data?.booking || null);
     } catch (err: unknown) {
@@ -298,7 +304,10 @@ export default function AdminBookingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'assign_cook', cook_id: selectedCookId }),
       });
-      if (!res.ok) throw new Error('Failed to assign cook');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error?.message || 'Failed to assign cook');
+      }
       setActionSuccessMsg('Cook assigned successfully!');
       setAssignModalOpen(false);
       fetchBookings(true);
@@ -319,7 +328,10 @@ export default function AdminBookingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'update_status', status: overrideStatus, remarks: statusRemarks }),
       });
-      if (!res.ok) throw new Error('Failed to update status');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error?.message || 'Failed to update status');
+      }
       setActionSuccessMsg('Booking status updated!');
       setStatusModalOpen(false);
       setStatusRemarks('');
@@ -341,7 +353,10 @@ export default function AdminBookingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'cancel', reason: cancelReason }),
       });
-      if (!res.ok) throw new Error('Failed to cancel booking');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error?.message || 'Failed to cancel booking');
+      }
       setActionSuccessMsg('Booking cancelled successfully');
       setCancelModalOpen(false);
       setCancelReason('');
@@ -364,7 +379,10 @@ export default function AdminBookingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'add_note', note: newNote }),
       });
-      if (!res.ok) throw new Error('Failed to add note');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error?.message || 'Failed to add note');
+      }
       setNewNote('');
       openDetails(selectedBookingId);
     } catch (err: unknown) {
@@ -561,9 +579,24 @@ export default function AdminBookingsPage() {
       </div>
 
       {error && (
-        <div className="p-4 bg-red-950/50 border border-red-800 text-red-300 rounded-lg text-sm flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{error}</span>
+        <div className="p-4 bg-red-950/50 border border-red-800 text-red-300 rounded-lg text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => fetchBookings()}
+              disabled={refreshing}
+              className="px-3 py-1.5 bg-red-900/50 hover:bg-red-800/50 text-red-200 text-xs font-semibold rounded-md border border-red-800 transition-colors flex items-center gap-1.5"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              Retry
+            </button>
+            <button onClick={() => setError(null)} className="p-1.5 hover:bg-red-900/50 rounded-md transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 

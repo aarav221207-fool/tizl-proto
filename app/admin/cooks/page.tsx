@@ -498,9 +498,19 @@ export default function AdminCooksPage() {
             <AlertCircle className="w-5 h-5 shrink-0" />
             <span>{error}</span>
           </div>
-          <button onClick={() => setError(null)} className="hover:text-white">
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => fetchCooks()}
+              disabled={refreshing}
+              className="px-3 py-1.5 bg-rose-900/40 hover:bg-rose-800/50 text-rose-200 text-xs font-semibold rounded-md border border-rose-800/50 transition-colors flex items-center gap-1.5"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              Retry
+            </button>
+            <button onClick={() => setError(null)} className="p-1.5 hover:bg-rose-900/40 rounded-md transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 

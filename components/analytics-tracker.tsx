@@ -56,19 +56,25 @@ export function AnalyticsTracker() {
     }
     lastTrackedPath.current = fullPath;
 
+    const anonymousId = getOrCreateAnonymousId();
+    const sessionId = getOrCreateSessionId();
+    const referrer = typeof document !== 'undefined' ? document.referrer : '';
+
     // Dispatch page view asynchronously without blocking UI
     const payload = {
       event_name: 'page_view',
       profile_id: user?.id || null,
+      visitor_id: anonymousId,
+      path: pathname,
+      referrer: referrer,
+      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
       event_data: {
-        path: pathname,
         full_path: fullPath,
-        referrer: typeof document !== 'undefined' ? document.referrer : '',
         title: typeof document !== 'undefined' ? document.title : '',
         device_type: getDeviceType(),
         screen: typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : '',
-        session_id: getOrCreateSessionId(),
-        anonymous_id: getOrCreateAnonymousId(),
+        session_id: sessionId,
+        anonymous_id: anonymousId,
       },
     };
 

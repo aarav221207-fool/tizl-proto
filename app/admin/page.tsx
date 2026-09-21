@@ -111,8 +111,24 @@ export default function AdminDashboardPage() {
       </div>
 
       {error && (
-        <div className="p-4 bg-red-950/50 border border-red-800 text-red-300 rounded-lg text-sm">
-          {error}
+        <div className="p-4 bg-red-950/50 border border-red-800 text-red-300 rounded-lg text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="w-5 h-5 shrink-0 flex items-center justify-center">⚠</span>
+            <span>{error}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => fetchMetrics()}
+              disabled={loading}
+              className="px-3 py-1.5 bg-red-900/50 hover:bg-red-800/50 text-red-200 text-xs font-semibold rounded-md border border-red-800 transition-colors flex items-center gap-1.5"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              Retry
+            </button>
+            <button onClick={() => setError(null)} className="p-1.5 hover:bg-red-900/50 rounded-md transition-colors">
+              <span className="w-4 h-4 flex items-center justify-center text-lg leading-none">×</span>
+            </button>
+          </div>
         </div>
       )}
 

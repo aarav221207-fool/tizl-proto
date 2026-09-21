@@ -73,8 +73,12 @@ export class AnalyticsService {
     client: SupabaseClient<Database>,
     payload: {
       profileId?: string | null;
+      visitorId?: string | null;
       eventName: string;
       eventData?: Record<string, unknown> | null;
+      path?: string | null;
+      referrer?: string | null;
+      userAgent?: string | null;
       ipAddress?: string | null;
     }
   ) {
@@ -83,8 +87,12 @@ export class AnalyticsService {
 
     return analyticsRepository.recordEvent(client, {
       profile_id: payload.profileId || null,
+      visitor_id: payload.visitorId || null,
       event_name: sanitizedName,
       event_data: sanitizedData,
+      path: payload.path || (sanitizedData.path as string) || null,
+      referrer: payload.referrer || (sanitizedData.referrer as string) || null,
+      user_agent: payload.userAgent || (sanitizedData.user_agent as string) || null,
       ip_address: payload.ipAddress || null,
     });
   }

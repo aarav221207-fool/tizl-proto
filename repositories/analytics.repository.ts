@@ -25,8 +25,12 @@ export class AnalyticsRepository extends BaseRepository<'analytics_events'> {
     client: SupabaseClient<Database>,
     event: {
       profile_id?: string | null;
+      visitor_id?: string | null;
       event_name: string;
       event_data?: Record<string, unknown> | null;
+      path?: string | null;
+      referrer?: string | null;
+      user_agent?: string | null;
       ip_address?: string | null;
     }
   ) {
@@ -34,8 +38,12 @@ export class AnalyticsRepository extends BaseRepository<'analytics_events'> {
       .from('analytics_events')
       .insert({
         profile_id: event.profile_id || null,
+        visitor_id: event.visitor_id || null,
         event_name: event.event_name,
         event_data: event.event_data || {},
+        path: event.path || null,
+        referrer: event.referrer || null,
+        user_agent: event.user_agent || null,
         ip_address: event.ip_address || null,
       })
       .select()

@@ -283,6 +283,28 @@ export default function AdminCustomersPage() {
           </div>
         </div>
       </div>
+      
+      {error && (
+        <div className="p-4 bg-red-950/50 border border-red-800 text-red-300 rounded-lg text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => fetchCustomers()}
+              disabled={refreshing}
+              className="px-3 py-1.5 bg-red-900/50 hover:bg-red-800/50 text-red-200 text-xs font-semibold rounded-md border border-red-800 transition-colors flex items-center gap-1.5"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              Retry
+            </button>
+            <button onClick={() => setError(null)} className="p-1.5 hover:bg-red-900/50 rounded-md transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

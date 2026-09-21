@@ -95,7 +95,10 @@ export default function AdminPaymentsPage() {
     setError(null);
     try {
       const res = await fetch('/api/admin/payments');
-      if (!res.ok) throw new Error('Failed to load payment transactions');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error?.message || 'Failed to load payment transactions');
+      }
       const data = await res.json();
       const payload = data.data || data;
       setPayments(payload.payments || []);

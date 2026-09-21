@@ -37,20 +37,26 @@ export default function AdminAuditLogsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [actionFilter, setActionFilter] = useState('all');
+  const [error, setError] = useState<string | null>(null);
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
 
   const fetchAuditLogs = async () => {
     try {
       setRefreshing(true);
+      setError(null);
       const params = new URLSearchParams();
       if (actionFilter !== 'all') params.set('action', actionFilter);
 
       const res = await fetch(`/api/admin/audit-logs?${params.toString()}`);
-      if (!res.ok) throw new Error('Failed to fetch audit logs');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error?.message || 'Failed to fetch audit logs');
+      }
       const data = await res.json();
       setLogs(data.data?.logs || data.logs || []);
     } catch (err: any) {
       console.error(err);
+      setError(err.message || 'An error occurred while loading audit logs.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -62,15 +68,20 @@ export default function AdminAuditLogsPage() {
     const loadLogs = async () => {
       try {
         setRefreshing(true);
+        setError(null);
         const params = new URLSearchParams();
         if (actionFilter !== 'all') params.set('action', actionFilter);
 
         const res = await fetch(`/api/admin/audit-logs?${params.toString()}`);
-        if (!res.ok) throw new Error('Failed to fetch audit logs');
+        if (!res.ok) {
+          const errData = await res.json().catch(() => null);
+          throw new Error(errData?.error?.message || 'Failed to fetch audit logs');
+        }
         const data = await res.json();
         if (!ignore) setLogs(data.data?.logs || data.logs || []);
       } catch (err: any) {
         console.error(err);
+        if (!ignore) setError(err.message || 'An error occurred while loading audit logs.');
       } finally {
         if (!ignore) {
           setLoading(false);
@@ -203,6 +214,28 @@ export default function AdminAuditLogsPage() {
           Showing <span className="text-white font-semibold">{filteredLogs.length}</span> recorded security events
         </div>
       </div>
+
+      {error && (
+        <div className="p-4 bg-red-950/50 border border-red-800 text-red-300 rounded-lg text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-5 h-5 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => fetchAuditLogs()}
+              disabled={refreshing}
+              className="px-3 py-1.5 bg-red-900/50 hover:bg-red-800/50 text-red-200 text-xs font-semibold rounded-md border border-red-800 transition-colors flex items-center gap-1.5"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              Retry
+            </button>
+            <button onClick={() => setError(null)} className="p-1.5 hover:bg-red-900/50 rounded-md transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Logs Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">

@@ -121,30 +121,58 @@ export type Database = {
           designation?: string | null;
           permissions?: Record<string, boolean>;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "admin_users_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       analytics_events: {
         Row: {
           id: string;
           profile_id: string | null;
+          visitor_id: string | null;
           event_name: string;
           event_data: Record<string, unknown> | null;
+          path: string | null;
+          referrer: string | null;
+          user_agent: string | null;
           ip_address: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
           profile_id?: string | null;
+          visitor_id?: string | null;
           event_name: string;
           event_data?: Record<string, unknown> | null;
+          path?: string | null;
+          referrer?: string | null;
+          user_agent?: string | null;
           ip_address?: string | null;
           created_at?: string;
         };
         Update: {
           event_name?: string;
           event_data?: Record<string, unknown> | null;
+          path?: string | null;
+          referrer?: string | null;
+          user_agent?: string | null;
+          ip_address?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "analytics_events_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       announcements: {
         Row: {
@@ -194,7 +222,15 @@ export type Database = {
           created_at?: string;
         };
         Update: Record<string, never>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       booking_cancellations: {
         Row: {

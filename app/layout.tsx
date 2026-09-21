@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://tizl.in'),
   title: 'Tizl — Book a Cook in 10 Minutes',
   description: 'Book a verified home cook in as little as 10 minutes. Tizl connects households with trusted cooks for breakfast, lunch, dinner, parties, and weekly meal services.',
+  alternates: {
+    canonical: 'https://tizl.in',
+  },
   robots: {
     index: true,
     follow: true,
@@ -26,8 +29,31 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Tizl',
+    url: 'https://tizl.in',
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: 'https://tizl.in/book',
+      'query-input': 'required name=search_term_string'
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'Tizl',
+      url: 'https://tizl.in'
+    }
+  };
+
   return (
     <html lang="en">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body suppressHydrationWarning>
         <AuthProvider>
           <Suspense fallback={null}>
@@ -39,4 +65,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
-

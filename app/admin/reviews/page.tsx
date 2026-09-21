@@ -85,7 +85,10 @@ export default function AdminReviewsPage() {
     setError(null);
     try {
       const res = await fetch('/api/admin/reviews');
-      if (!res.ok) throw new Error('Failed to load reviews');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error?.message || 'Failed to load reviews');
+      }
       const data = await res.json();
       const payload = data.data || data;
       setReviews(payload.reviews || []);

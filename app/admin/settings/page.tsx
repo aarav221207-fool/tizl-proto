@@ -75,7 +75,10 @@ export default function AdminSettingsPage() {
     try {
       setRefreshing(true);
       const res = await fetch('/api/admin/settings');
-      if (!res.ok) throw new Error('Failed to fetch settings');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error?.message || 'Failed to fetch settings');
+      }
       const data = await res.json();
       const payload = data.data || data;
       setCities(payload.cities || []);
@@ -96,7 +99,10 @@ export default function AdminSettingsPage() {
       try {
         setRefreshing(true);
         const res = await fetch('/api/admin/settings');
-        if (!res.ok) throw new Error('Failed to fetch settings');
+        if (!res.ok) {
+          const errData = await res.json().catch(() => null);
+          throw new Error(errData?.error?.message || 'Failed to fetch settings');
+        }
         const data = await res.json();
         if (!ignore) {
           const payload = data.data || data;

@@ -11,6 +11,10 @@ export async function POST(req: NextRequest) {
     const eventData = body.event_data || body.eventData || {};
 
     let profileId = body.profile_id || body.profileId || null;
+    const visitorId = body.visitor_id || body.visitorId || null;
+    const path = body.path || null;
+    const referrer = body.referrer || null;
+    const userAgent = body.user_agent || body.userAgent || req.headers.get('user-agent');
 
     try {
       const supabase = await createClient();
@@ -39,8 +43,12 @@ export async function POST(req: NextRequest) {
 
     await analyticsService.recordEvent(dbClient, {
       profileId,
+      visitorId,
       eventName,
       eventData,
+      path,
+      referrer,
+      userAgent,
       ipAddress,
     });
 

@@ -22,6 +22,8 @@ import {
   Compass,
   UserCheck,
   UserX,
+  AlertCircle,
+  X,
 } from 'lucide-react';
 
 interface VisitorAnalytics {
@@ -60,17 +62,23 @@ export default function AdminAnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | 'all'>('7d');
 
   const fetchAnalytics = async () => {
     try {
       setRefreshing(true);
+      setError(null);
       const res = await fetch('/api/admin/analytics');
-      if (!res.ok) throw new Error('Failed to fetch analytics data');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error?.message || 'Failed to fetch analytics data');
+      }
       const json = await res.json();
       setData(json.data?.analytics || json.analytics || null);
     } catch (err: any) {
       console.error(err);
+      setError(err.message || 'An error occurred while loading analytics.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -82,12 +90,17 @@ export default function AdminAnalyticsPage() {
     const loadData = async () => {
       try {
         setRefreshing(true);
+        setError(null);
         const res = await fetch('/api/admin/analytics');
-        if (!res.ok) throw new Error('Failed to fetch analytics data');
+        if (!res.ok) {
+          const errData = await res.json().catch(() => null);
+          throw new Error(errData?.error?.message || 'Failed to fetch analytics data');
+        }
         const json = await res.json();
         if (!ignore) setData(json.data?.analytics || json.analytics || null);
       } catch (err: any) {
         console.error(err);
+        if (!ignore) setError(err.message || 'An error occurred while loading analytics.');
       } finally {
         if (!ignore) {
           setLoading(false);
@@ -139,6 +152,28 @@ export default function AdminAnalyticsPage() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="p-4 bg-red-950/50 border border-red-800 text-red-300 rounded-lg text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => fetchAnalytics()}
+              disabled={refreshing}
+              className="px-3 py-1.5 bg-red-900/50 hover:bg-red-800/50 text-red-200 text-xs font-semibold rounded-md border border-red-800 transition-colors flex items-center gap-1.5"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              Retry
+            </button>
+            <button onClick={() => setError(null)} className="p-1.5 hover:bg-red-900/50 rounded-md transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="p-16 text-center text-slate-400 space-y-3 bg-slate-900 rounded-xl border border-slate-800">
