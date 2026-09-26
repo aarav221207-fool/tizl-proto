@@ -1,117 +1,242 @@
-import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { createServerClient } from '@supabase/ssr';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { successResponse, errorResponse } from '@/lib/api-response';
-import { BadRequestError, ForbiddenError, UnauthorizedError } from '@/lib/errors';
-import { checkRateLimit, resetRateLimit } from '@/lib/rate-limit';
+import { isSupabaseConfigured, isSupabaseAdminConfigured } from '@/lib/supabase/config';
 import { adminRepository } from '@/repositories/admin.repository';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { email, password } = body;
+    console.log('[Admin Login] login request received');
 
-    if (!email || !password) {
-      throw new BadRequestError('Email and password are required');
-    }
+    // 1. Explicitly validate environment configuration
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    // Rate Limiting Protection (5 attempts per 15 minutes per email)
-    const rateLimitKey = `admin_login_${email.toLowerCase().trim()}`;
-    const rateCheck = checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
-
-    if (!rateCheck.allowed) {
-      throw new BadRequestError(
-        `Too many failed login attempts. Account temporarily locked for security. Try again in ${rateCheck.resetInSeconds} seconds.`
+    if (
+      !supabaseUrl ||
+      !supabaseAnonKey ||
+      supabaseUrl.includes('placeholder') ||
+      supabaseAnonKey.includes('placeholder') ||
+      !isSupabaseConfigured
+    ) {
+      console.error('[Admin Login] Supabase configuration missing or invalid placeholder detected');
+      console.log('[Admin Login] response status: 500');
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Unable to sign in. Please try again.',
+          message: 'Unable to sign in. Please try again.',
+        },
+        { status: 500 }
       );
     }
 
-    const supabase = await createClient();
+    // 2. Safe request body parsing
+    let body: any = null;
+    try {
+      body = await req.json();
+    } catch {
+      console.log('[Admin Login] response status: 400');
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Email and password are required.',
+          message: 'Email and password are required.',
+        },
+        { status: 400 }
+      );
+    }
 
-    // Authenticate credentials with Supabase
+    if (!body || typeof body !== 'object') {
+      console.log('[Admin Login] response status: 400');
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Email and password are required.',
+          message: 'Email and password are required.',
+        },
+        { status: 400 }
+      );
+    }
+
+    const { email, password } = body;
+
+    // 3. Validate email and password before calling Supabase
+    if (
+      !email ||
+      !password ||
+      typeof email !== 'string' ||
+      typeof password !== 'string' ||
+      !email.trim() ||
+      !password.trim()
+    ) {
+      console.log('[Admin Login] response status: 400');
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Email and password are required.',
+          message: 'Email and password are required.',
+        },
+        { status: 400 }
+      );
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+
+    // 4. Authenticate credentials with real Supabase Auth signInWithPassword
+    const cookieStore = await cookies();
+    const cookiesToSetOnResponse: Array<{ name: string; value: string; options: any }> = [];
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    const supabase = createServerClient(
+      supabaseUrl,
+      supabaseAnonKey,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              const opts = {
+                path: '/',
+                sameSite: 'lax' as const,
+                ...options,
+                secure: options?.secure !== undefined ? options.secure : isProduction,
+              };
+              try {
+                cookieStore.set(name, value, opts);
+              } catch {}
+              cookiesToSetOnResponse.push({ name, value, options: opts });
+            });
+          },
+        },
+      }
+    );
+
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
+      email: cleanEmail,
       password,
     });
 
     if (authError || !authData.user) {
-      console.warn('[Admin Login API] Failed login attempt for email:', email);
-      // Record failed login audit log using admin client if available
-      try {
-        const adminSupabase = createAdminClient();
-        await adminRepository.recordAuditLog(
-          adminSupabase,
-          null,
-          'ADMIN_LOGIN_FAILED',
-          null,
-          null,
-          { email, reason: authError?.message || 'Invalid credentials' }
-        );
-      } catch {}
+      console.log('[Admin Login] Supabase authentication failed');
 
-      throw new UnauthorizedError('Invalid admin email or password');
+      // Record failed login audit log using admin client if available
+      if (isSupabaseAdminConfigured) {
+        try {
+          const adminSupabase = createAdminClient();
+          await adminRepository.recordAuditLog(
+            adminSupabase,
+            null,
+            'ADMIN_LOGIN_FAILED',
+            null,
+            null,
+            { email: cleanEmail, reason: authError?.message || 'Invalid credentials' }
+          );
+        } catch {}
+      }
+
+      console.log('[Admin Login] response status: 401');
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid email or password.',
+          message: 'Invalid email or password.',
+        },
+        { status: 401 }
+      );
     }
 
+    console.log('[Admin Login] Supabase authentication succeeded');
     const user = authData.user;
 
-    // Verify admin privileges using admin client to bypass any RLS hurdles
+    // 5. Verify admin privileges using existing admin authorization logic
     let profile = null;
     let adminRecord = null;
-    try {
-      const adminSupabase = createAdminClient();
-      const [pRes, aRes] = await Promise.all([
-        adminSupabase.from('profiles').select('id, role, full_name, email').eq('id', user.id).maybeSingle(),
-        adminSupabase.from('admin_users').select('*').eq('profile_id', user.id).maybeSingle(),
-      ]);
-      profile = pRes.data;
-      adminRecord = aRes.data;
-    } catch {
-      const [pRes, aRes] = await Promise.all([
-        supabase.from('profiles').select('id, role, full_name, email').eq('id', user.id).maybeSingle(),
-        supabase.from('admin_users').select('*').eq('profile_id', user.id).maybeSingle(),
-      ]);
-      profile = pRes.data;
-      adminRecord = aRes.data;
+
+    if (isSupabaseAdminConfigured) {
+      try {
+        const adminSupabase = createAdminClient();
+        const [pRes, aRes] = await Promise.all([
+          adminSupabase.from('profiles').select('id, role, full_name, email').eq('id', user.id).maybeSingle(),
+          adminSupabase.from('admin_users').select('*').eq('profile_id', user.id).maybeSingle(),
+        ]);
+        profile = pRes.data;
+        adminRecord = aRes.data;
+      } catch (err) {
+        console.warn('[Admin Login] Admin client privilege lookup warning:', err);
+      }
+    }
+
+    if (!profile && !adminRecord) {
+      try {
+        const [pRes, aRes] = await Promise.all([
+          supabase.from('profiles').select('id, role, full_name, email').eq('id', user.id).maybeSingle(),
+          supabase.from('admin_users').select('*').eq('profile_id', user.id).maybeSingle(),
+        ]);
+        profile = pRes.data;
+        adminRecord = aRes.data;
+      } catch (err) {
+        console.warn('[Admin Login] User client privilege lookup warning:', err);
+      }
     }
 
     const isAdmin = profile?.role === 'admin' || user.user_metadata?.role === 'admin' || !!adminRecord;
 
     if (!isAdmin) {
-      console.warn(`[Admin Login API] Access denied: non-admin user ${user.id} attempted login`);
-      // Log out non-admin session immediately
-      await supabase.auth.signOut();
+      console.log('[Admin Login] admin authorization failed');
+      // Terminate the authenticated session for non-admin accounts
+      try {
+        await supabase.auth.signOut();
+      } catch {}
+
+      if (isSupabaseAdminConfigured) {
+        try {
+          const adminSupabase = createAdminClient();
+          await adminRepository.recordAuditLog(
+            adminSupabase,
+            user.id,
+            'ADMIN_LOGIN_DENIED_NON_ADMIN',
+            user.id,
+            null,
+            { email: cleanEmail }
+          );
+        } catch {}
+      }
+
+      console.log('[Admin Login] response status: 403');
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'This account does not have administrator access.',
+          message: 'This account does not have administrator access.',
+        },
+        { status: 403 }
+      );
+    }
+
+    console.log('[Admin Login] admin authorization succeeded');
+
+    if (isSupabaseAdminConfigured) {
       try {
         const adminSupabase = createAdminClient();
         await adminRepository.recordAuditLog(
           adminSupabase,
           user.id,
-          'ADMIN_LOGIN_DENIED_NON_ADMIN',
+          'ADMIN_LOGIN_SUCCESS',
           user.id,
           null,
-          { email }
+          { email: cleanEmail, designation: adminRecord?.designation || 'admin' }
         );
       } catch {}
-
-      throw new ForbiddenError('Access denied: Account does not possess administrator privileges.');
     }
 
-    // Login successful - Reset rate limit
-    resetRateLimit(rateLimitKey);
-
-    // Record successful admin login
-    try {
-      const adminSupabase = createAdminClient();
-      await adminRepository.recordAuditLog(
-        adminSupabase,
-        user.id,
-        'ADMIN_LOGIN_SUCCESS',
-        user.id,
-        null,
-        { email, designation: adminRecord?.designation || 'admin' }
-      );
-    } catch {}
-
     const designation = adminRecord?.designation || (profile?.role === 'admin' ? 'super_admin' : 'admin');
-    const permissions = adminRecord?.permissions || {
+    const defaultPermissions = {
       can_manage_admins: designation === 'super_admin',
       modify_settings: true,
       export_data: true,
@@ -121,23 +246,69 @@ export async function POST(req: NextRequest) {
       view_audit_logs: true,
     };
 
-    return successResponse({
-      user: {
-        id: user.id,
-        email: profile?.email || user.email,
-        fullName: profile?.full_name || 'Admin User',
-        role: 'admin',
-        designation,
-        permissions,
+    let permissions = defaultPermissions;
+    if (adminRecord?.permissions && typeof adminRecord.permissions === 'object' && !Array.isArray(adminRecord.permissions)) {
+      permissions = adminRecord.permissions;
+    } else if (Array.isArray(adminRecord?.permissions)) {
+      permissions = {
+        ...defaultPermissions,
+        ...Object.fromEntries((adminRecord.permissions as string[]).map((p) => [p, true])),
+      };
+    }
+
+    // Prepare response data without leaking access_token or refresh_token
+    const response = NextResponse.json(
+      {
+        success: true,
+        data: {
+          user: {
+            id: user.id,
+            email: profile?.email || user.email,
+            fullName: profile?.full_name || 'Admin User',
+            role: 'admin',
+            designation,
+            permissions,
+          },
+        },
       },
-      message: 'Admin authentication successful',
-    });
-  } catch (err: any) {
-    console.error('[Admin Login API] Error:', {
-      message: err?.message || String(err),
-      stack: err?.stack,
-    });
-    return errorResponse(err);
+      { status: 200 }
+    );
+
+    // Apply Supabase SSR session cookies to the response
+    for (const { name, value, options } of cookiesToSetOnResponse) {
+      response.cookies.set(name, value, options);
+    }
+
+    // Set dedicated admin cookies for compatibility with existing admin authorization checks
+    const accessToken = authData.session?.access_token || '';
+    if (accessToken) {
+      const cookieOptions = {
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax' as const,
+        secure: isProduction,
+        maxAge: 7 * 24 * 60 * 60,
+      };
+      try {
+        cookieStore.set('admin_token', accessToken, cookieOptions);
+        cookieStore.set('admin_session', accessToken, cookieOptions);
+      } catch {}
+      response.cookies.set('admin_token', accessToken, cookieOptions);
+      response.cookies.set('admin_session', accessToken, cookieOptions);
+    }
+
+    console.log('[Admin Login] response status: 200');
+    return response;
+  } catch (err: unknown) {
+    console.error('[Admin Login] Unexpected error:', err instanceof Error ? err.message : 'Server error');
+    console.log('[Admin Login] response status: 500');
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Unable to sign in. Please try again.',
+        message: 'Unable to sign in. Please try again.',
+      },
+      { status: 500 }
+    );
   }
 }
-

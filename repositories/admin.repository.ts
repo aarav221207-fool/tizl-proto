@@ -108,7 +108,10 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
     });
   }
 
-  async getDashboardMetrics(client: SupabaseClient<Database>) {
+  async getDashboardMetrics(
+    client: SupabaseClient<Database>,
+    options?: { days?: number; startDate?: string; endDate?: string }
+  ) {
     const [
       bookingsRes,
       cooksProfilesRes,
@@ -184,33 +187,45 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
       });
     }
 
-    const errors = [
+    const criticalErrors = [
       bookingsRes.error ? `bookings: ${bookingsRes.error.message}` : null,
-      cooksProfilesRes.error ? `cook profiles: ${cooksProfilesRes.error.message}` : null,
-      cooksRes.error ? `cooks: ${cooksRes.error.message}` : null,
-      customersRes.error ? `customer profiles: ${customersRes.error.message}` : null,
-      servicesRes.error ? `services: ${servicesRes.error.message}` : null,
-      citiesRes.error ? `cities: ${citiesRes.error.message}` : null,
-      addressesRes.error ? `addresses: ${addressesRes.error.message}` : null,
     ].filter(Boolean);
 
-    if (errors.length > 0) {
-      throw new Error(`Database query failed — ${errors.join('; ')}`);
+    if (criticalErrors.length > 0) {
+      throw new Error(`Database query failed — ${criticalErrors.join('; ')}`);
     }
 
     const bookings = bookingsRes.data || [];
     const cooksProfiles = cooksProfilesRes.data || [];
     const cooksList = cooksRes.data || [];
 
-    // In-memory join for cooks and cook profiles
-    const cooks = cooksProfiles.map((profile) => {
-      const details = cooksList.find(
-        (d) => d.id === profile.id || d.profile_id === profile.id
-      );
+    // In-memory join for cooks and cook profiles ensuring all cooks are represented
+    const cookProfileMap = new Map(cooksProfiles.map((p) => [p.id, p]));
+    const cooks: any[] = cooksList.map((c) => {
+      const profile = cookProfileMap.get(c.profile_id) || cookProfileMap.get(c.id);
       return {
-        ...profile,
-        cook_details: details || null,
+        ...(profile || {
+          id: c.profile_id || c.id,
+          full_name: c.display_name || 'Cook Partner',
+          email: '',
+          phone: null,
+          role: 'cook',
+          status: 'active',
+          created_at: c.created_at,
+          updated_at: c.updated_at,
+        }),
+        cook_details: c,
       };
+    });
+
+    // Also include any profiles with role='cook' that don't have a cooks row yet
+    cooksProfiles.forEach((p) => {
+      if (!cooks.some((c) => c.id === p.id || c.cook_details?.profile_id === p.id)) {
+        cooks.push({
+          ...p,
+          cook_details: null,
+        });
+      }
     });
 
     const customers = customersRes.data || [];
@@ -218,8 +233,35 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
     const cities = citiesRes.data || [];
     const addresses = addressesRes.data || [];
 
+    // Determine date range filter
+    let startIso: string | null = null;
+    let endIso: string | null = null;
+    let daysCount = 7;
+
+    if (options?.days) {
+      daysCount = options.days;
+      const d = new Date();
+      d.setDate(d.getDate() - daysCount);
+      startIso = d.toISOString().split('T')[0];
+    } else if (options?.startDate) {
+      startIso = options.startDate.split('T')[0];
+      endIso = options.endDate ? options.endDate.split('T')[0] : new Date().toISOString().split('T')[0];
+      const startMs = new Date(startIso).getTime();
+      const endMs = new Date(endIso).getTime();
+      daysCount = Math.max(1, Math.min(180, Math.round((endMs - startMs) / (1000 * 60 * 60 * 24)) + 1));
+    }
+
+    // Filter bookings if date range is specified
+    const rangeBookings = bookings.filter((b) => {
+      const bDate = b.booking_date || b.created_at?.split('T')[0];
+      if (!bDate) return true;
+      if (startIso && bDate < startIso) return false;
+      if (endIso && bDate > endIso) return false;
+      return true;
+    });
+
     // Calculate total revenue from completed/paid bookings
-    const completedBookings = bookings.filter((b) => ['completed', 'paid'].includes(b.status));
+    const completedBookings = rangeBookings.filter((b) => ['completed', 'paid'].includes(b.status));
     const totalRevenue = completedBookings.reduce(
       (sum, b) => sum + (Number(b.total_amount) || 0),
       0
@@ -235,7 +277,7 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
       (c) => c.cook_details?.is_available === true || c.status === 'active' || c.status === 'online'
     ).length;
 
-    // Funnel breakdown
+    // Funnel breakdown for range
     const bookingFunnel: Record<string, number> = {
       pending_confirmation: 0,
       searching: 0,
@@ -249,7 +291,7 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
       refunded: 0,
     };
 
-    bookings.forEach((b) => {
+    rangeBookings.forEach((b) => {
       const statusKey = b.status || 'pending_confirmation';
       bookingFunnel[statusKey] = (bookingFunnel[statusKey] || 0) + 1;
     });
@@ -257,7 +299,7 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
     // Top services aggregation
     const serviceMap = new Map(services.map((s) => [s.id, s.name]));
     const serviceCountMap: Record<string, { name: string; count: number; revenue: number }> = {};
-    bookings.forEach((b) => {
+    rangeBookings.forEach((b) => {
       const sName = serviceMap.get(b.service_id) || 'Standard Cooking';
       if (!serviceCountMap[sName]) {
         serviceCountMap[sName] = { name: sName, count: 0, revenue: 0 };
@@ -275,7 +317,7 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
     const addressCityMap = new Map(addresses.map((a) => [a.id, a.city_id]));
     const cityMap = new Map(cities.map((c) => [c.id, c.name]));
     const cityCountMap: Record<string, { name: string; count: number }> = {};
-    bookings.forEach((b) => {
+    rangeBookings.forEach((b) => {
       const cityId = addressCityMap.get(b.address_id);
       const cityName = cityId ? cityMap.get(cityId) || 'Delhi NCR' : 'Delhi NCR';
       if (!cityCountMap[cityName]) {
@@ -287,17 +329,17 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    // Daily trends (last 7 days)
+    // Daily trends for range
     const trendsMap: Record<string, { date: string; bookings: number; revenue: number }> = {};
-    const now = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
+    const refDate = endIso ? new Date(endIso) : new Date();
+    for (let i = daysCount - 1; i >= 0; i--) {
+      const d = new Date(refDate);
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
       trendsMap[dateStr] = { date: dateStr, bookings: 0, revenue: 0 };
     }
 
-    bookings.forEach((b) => {
+    rangeBookings.forEach((b) => {
       const bDate = b.booking_date || b.created_at?.split('T')[0];
       if (bDate && trendsMap[bDate]) {
         trendsMap[bDate].bookings += 1;
@@ -309,7 +351,8 @@ export class AdminRepository extends BaseRepository<'admin_users'> {
 
     return {
       totalRevenue,
-      totalBookings: bookings.length,
+      totalBookings: rangeBookings.length,
+      allTimeBookingsCount: bookings.length,
       activeCooks,
       onlineCooks,
       newCustomers: customers.length,

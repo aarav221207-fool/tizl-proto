@@ -22,7 +22,7 @@ export class AnalyticsRepository extends BaseRepository<'analytics_events'> {
    * Record a new analytics / page view event
    */
   async recordEvent(
-    client: SupabaseClient<Database>,
+    client: SupabaseClient<Database> | null | undefined,
     event: {
       profile_id?: string | null;
       visitor_id?: string | null;
@@ -34,23 +34,35 @@ export class AnalyticsRepository extends BaseRepository<'analytics_events'> {
       ip_address?: string | null;
     }
   ) {
+    if (!client) {
+      return null;
+    }
+    const mergedEventData: Record<string, unknown> = {
+      ...(event.event_data || {}),
+      path: event.path || (event.event_data?.path as string) || '/',
+      referrer: event.referrer || (event.event_data?.referrer as string) || '',
+      user_agent: event.user_agent || (event.event_data?.user_agent as string) || '',
+      visitor_id: event.visitor_id || (event.event_data?.visitor_id as string) || '',
+    };
+
+    const insertPayload: Record<string, unknown> = {
+      profile_id: event.profile_id || null,
+      event_name: event.event_name,
+      event_data: mergedEventData,
+      ip_address: event.ip_address || null,
+    };
+
     const { data, error } = await client
       .from('analytics_events')
-      .insert({
-        profile_id: event.profile_id || null,
-        visitor_id: event.visitor_id || null,
-        event_name: event.event_name,
-        event_data: event.event_data || {},
-        path: event.path || null,
-        referrer: event.referrer || null,
-        user_agent: event.user_agent || null,
-        ip_address: event.ip_address || null,
-      })
+      .insert(insertPayload as any)
       .select()
       .single();
 
     if (error) {
-      console.error('Failed to record analytics event:', error);
+      console.warn('[Analytics Repository] Database INSERT note for event:', event.event_name, {
+        code: error.code,
+        message: error.message,
+      });
       return null;
     }
 
@@ -58,34 +70,94 @@ export class AnalyticsRepository extends BaseRepository<'analytics_events'> {
   }
 
   /**
+   * Fetch event timeline for admin analytics
+   */
+  async getEventTimeline(
+    client: SupabaseClient<Database> | null | undefined,
+    limit = 50,
+    options?: { startDate?: string; endDate?: string; eventName?: string }
+  ) {
+    if (!client) {
+      return [];
+    }
+    let query = client
+      .from('analytics_events')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (options?.startDate) {
+      query = query.gte('created_at', options.startDate);
+    }
+    if (options?.endDate) {
+      query = query.lte('created_at', options.endDate);
+    }
+    if (options?.eventName) {
+      query = query.eq('event_name', options.eventName);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('Failed to fetch event timeline:', error);
+      return [];
+    }
+    return data || [];
+  }
+
+  /**
    * Fetch and aggregate visitor analytics for admins
    */
   async getVisitorAnalytics(
-    client: SupabaseClient<Database>,
-    days = 30
+    client: SupabaseClient<Database> | null | undefined,
+    options: number | { days?: number; startDate?: string; endDate?: string } = 30
   ): Promise<VisitorAnalyticsSummary> {
+    const emptySummary: VisitorAnalyticsSummary = {
+      totalPageViews: 0,
+      uniqueVisitors: 0,
+      authenticatedVisitors: 0,
+      anonymousVisitors: 0,
+      dailyTraffic: [],
+      topPages: [],
+      deviceBreakdown: {},
+      topReferrers: [],
+    };
+    if (!client) {
+      return emptySummary;
+    }
+
+    let days = 30;
+    let customStart: string | null = null;
+    let customEnd: string | null = null;
+
+    if (typeof options === 'number') {
+      days = options;
+    } else if (options && typeof options === 'object') {
+      if (options.days) days = options.days;
+      if (options.startDate) customStart = options.startDate;
+      if (options.endDate) customEnd = options.endDate;
+    }
+
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
-    const startDateIso = startDate.toISOString();
+    const startDateIso = customStart || startDate.toISOString();
 
-    const { data, error } = await client
+    let query = client
       .from('analytics_events')
       .select('*')
-      .gte('created_at', startDateIso)
       .order('created_at', { ascending: false });
+
+    if (startDateIso) {
+      query = query.gte('created_at', startDateIso);
+    }
+    if (customEnd) {
+      query = query.lte('created_at', customEnd);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Failed to fetch analytics events:', error);
-      return {
-        totalPageViews: 0,
-        uniqueVisitors: 0,
-        authenticatedVisitors: 0,
-        anonymousVisitors: 0,
-        dailyTraffic: [],
-        topPages: [],
-        deviceBreakdown: {},
-        topReferrers: [],
-      };
+      return emptySummary;
     }
 
     const events = data || [];

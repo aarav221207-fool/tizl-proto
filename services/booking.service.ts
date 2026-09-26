@@ -4,6 +4,7 @@ import { bookingsRepository } from '@/repositories/bookings.repository';
 import { servicesRepository } from '@/repositories/services.repository';
 import { addressesRepository } from '@/repositories/addresses.repository';
 import { cooksRepository } from '@/repositories/cooks.repository';
+import { analyticsService } from '@/services/analytics.service';
 import { BadRequestError, NotFoundError } from '@/lib/errors';
 
 /**
@@ -51,6 +52,7 @@ export class BookingService {
       duration_hours: number;
       guest_count?: number;
       cooking_notes?: string;
+      cook_id?: string | null;
     }
   ) {
     if (!data.booking_date || !data.start_time || !data.duration_hours) {
@@ -111,6 +113,7 @@ export class BookingService {
     // 5. Create record via repository
     const booking = await bookingsRepository.createBooking(client, {
       customer_id: customerId,
+      cook_id: data.cook_id || null,
       service_id: service.id,
       address_id: addressId,
       booking_date: data.booking_date,
@@ -129,6 +132,25 @@ export class BookingService {
       booking_number: bookingsRepository.generateBookingNumber(),
       status: 'pending_confirmation',
     });
+
+    // 6. Record authoritative booking_created analytics event (non-fatal)
+    try {
+      await analyticsService.recordEvent(client, {
+        profileId: customerId,
+        eventName: 'booking_created',
+        eventData: {
+          booking_id: booking.id,
+          booking_number: booking.booking_number,
+          total_amount: booking.total_amount,
+          service_id: booking.service_id,
+          cook_id: booking.cook_id,
+          status: booking.status,
+        },
+        path: '/bookings',
+      });
+    } catch (analyticsErr) {
+      console.error('[Analytics] Failed to record booking_created event:', analyticsErr);
+    }
 
     return booking;
   }
@@ -180,13 +202,32 @@ export class BookingService {
 
     this.validateTransition(booking.status as BookingStatus, newStatus);
 
-    return bookingsRepository.updateBookingStatus(
+    const updated = await bookingsRepository.updateBookingStatus(
       client,
       bookingId,
       newStatus,
       changedById,
       remarks || `Status transitioned to ${newStatus}`
     );
+
+    // Record booking status change event (non-fatal)
+    try {
+      await analyticsService.recordEvent(client, {
+        profileId: changedById,
+        eventName: 'booking_status_changed',
+        eventData: {
+          booking_id: bookingId,
+          old_status: booking.status,
+          new_status: newStatus,
+          remarks: remarks || null,
+        },
+        path: `/bookings/${bookingId}`,
+      });
+    } catch (analyticsErr) {
+      console.error('[Analytics] Failed to record booking_status_changed event:', analyticsErr);
+    }
+
+    return updated;
   }
 
   /**

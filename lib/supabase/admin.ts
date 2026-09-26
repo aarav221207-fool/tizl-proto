@@ -1,4 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import { isSupabaseConfigured, isSupabaseAdminConfigured } from './config';
+
+export { isSupabaseConfigured, isSupabaseAdminConfigured };
 
 /**
  * Service Role Supabase Client
@@ -10,8 +13,8 @@ export function createAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-  if (!serviceRoleKey || serviceRoleKey === 'placeholder-service-role-key') {
-    throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for server-side admin operations.');
+  if (!serviceRoleKey || serviceRoleKey.includes('placeholder') || !supabaseUrl || supabaseUrl.includes('placeholder')) {
+    throw new Error('Valid SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SUPABASE_URL are required for server-side admin operations.');
   }
 
   return createClient(
@@ -25,3 +28,4 @@ export function createAdminClient() {
     }
   );
 }
+

@@ -38,17 +38,60 @@ export default function AdminLoginPage() {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
-      const json = await res.json();
-
-      if (!res.ok || !json.success) {
-        throw new Error(json.error?.message || 'Admin authentication failed');
+      let json: any = null;
+      try {
+        json = await res.json();
+      } catch {
+        json = null;
       }
 
-      // Successful login -> Redirect to Admin Dashboard
-      router.push('/admin');
+      if (!res.ok || !json || !json.success) {
+        const errorMsg =
+          (typeof json?.error === 'object' && typeof json?.error?.message === 'string')
+            ? json.error.message
+            : typeof json?.error === 'string'
+            ? json.error
+            : typeof json?.message === 'string'
+            ? json.message
+            : (res.status === 401
+                ? 'Invalid email or password.'
+                : res.status === 403
+                ? 'This account does not have administrator access.'
+                : res.status >= 500
+                ? 'Unable to sign in. Please try again.'
+                : 'Invalid email or password.');
+        throw new Error(errorMsg);
+      }
+
+      // Explicitly verify the authenticated state via /api/admin/me before navigating using HTTP-only cookies
+      const verifyRes = await fetch('/api/admin/me', {
+        credentials: 'include',
+      });
+      let verifyJson: any = null;
+      try {
+        verifyJson = await verifyRes.json();
+      } catch {
+        verifyJson = null;
+      }
+
+      if (!verifyRes.ok || !verifyJson || !verifyJson.success) {
+        const verifyError =
+          (typeof verifyJson?.error === 'object' && typeof verifyJson?.error?.message === 'string')
+            ? verifyJson.error.message
+            : typeof verifyJson?.error === 'string'
+            ? verifyJson.error
+            : typeof verifyJson?.message === 'string'
+            ? verifyJson.message
+            : 'Authentication succeeded, but admin session could not be verified on the server. Please try again.';
+        throw new Error(verifyError);
+      }
+
+      // Successful verified login -> Redirect to Admin Dashboard
+      router.replace('/admin');
       router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed. Please check credentials.');
@@ -65,23 +108,52 @@ export default function AdminLoginPage() {
       const res = await fetch('/api/admin/bootstrap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
-      const json = await res.json();
-
-      if (!res.ok || !json.success) {
-        throw new Error(json.error?.message || 'Bootstrap initialization failed');
+      let json: any = null;
+      try {
+        json = await res.json();
+      } catch {
+        json = null;
       }
 
-      setBootstrapSuccess('Super Admin bootstrapped successfully! Logging in...');
+      if (!res.ok || !json || !json.success) {
+        const errorMsg =
+          typeof json?.error === 'string'
+            ? json.error
+            : json?.error?.message || 'Bootstrap initialization failed';
+        throw new Error(errorMsg);
+      }
+
+      // Verify the bootstrap admin session via /api/admin/me before navigating
+      const verifyRes = await fetch('/api/admin/me', {
+        credentials: 'include',
+      });
+      let verifyJson: any = null;
+      try {
+        verifyJson = await verifyRes.json();
+      } catch {
+        verifyJson = null;
+      }
+
+      if (!verifyRes.ok || !verifyJson || !verifyJson.success) {
+        const verifyError =
+          typeof verifyJson?.error === 'string'
+            ? verifyJson.error
+            : verifyJson?.error?.message ||
+              'Super admin was created, but session could not be verified. Please log in with your credentials.';
+        throw new Error(verifyError);
+      }
+
+      setBootstrapSuccess('Super Admin bootstrapped successfully! Navigating to dashboard...');
       setBootstrapAvailable(false);
 
-      // Auto login after bootstrap
       setTimeout(() => {
-        router.push('/admin');
+        router.replace('/admin');
         router.refresh();
-      }, 1000);
+      }, 800);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Bootstrap failed.');
     } finally {

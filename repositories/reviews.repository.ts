@@ -1,6 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
 import { BaseRepository } from './base.repository';
+import { analyticsService } from '@/services/analytics.service';
 
 export class ReviewsRepository extends BaseRepository<'reviews'> {
   constructor() {
@@ -42,6 +43,23 @@ export class ReviewsRepository extends BaseRepository<'reviews'> {
     if (error || !data) {
       throw error || new Error('Failed to create review');
     }
+
+    // Record review_created event
+    try {
+      await analyticsService.recordEvent(client, {
+        profileId: reviewData.customer_id,
+        eventName: 'review_created',
+        eventData: {
+          review_id: data.id,
+          booking_id: reviewData.booking_id,
+          customer_id: reviewData.customer_id,
+          cook_id: reviewData.cook_id,
+          rating: reviewData.rating,
+          comment: reviewData.comment || null,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch {}
 
     return data;
   }

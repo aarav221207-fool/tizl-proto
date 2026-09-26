@@ -44,11 +44,22 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const getAuthHeaders = (): HeadersInit => {
+    try {
+      const token = sessionStorage.getItem('tizl_admin_token');
+      if (token) return { Authorization: `Bearer ${token}` };
+    } catch {}
+    return {};
+  };
+
   const fetchMetrics = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/dashboard');
+      const res = await fetch('/api/admin/dashboard', {
+        credentials: 'include',
+        headers: getAuthHeaders(),
+      });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error?.message || data.error || 'Failed to load dashboard metrics');
@@ -65,7 +76,10 @@ export default function AdminDashboardPage() {
     let ignore = false;
     const load = async () => {
       try {
-        const res = await fetch('/api/admin/dashboard');
+        const res = await fetch('/api/admin/dashboard', {
+          credentials: 'include',
+          headers: getAuthHeaders(),
+        });
         const data = await res.json();
         if (!res.ok) {
           throw new Error(data.error?.message || data.error || 'Failed to load dashboard metrics');

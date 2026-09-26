@@ -361,9 +361,13 @@ export class AdminService {
   /**
    * Fetch aggregated admin dashboard metrics
    */
-  async getDashboardMetrics(client: SupabaseClient<Database>, adminUserId: string) {
+  async getDashboardMetrics(
+    client: SupabaseClient<Database>,
+    adminUserId: string,
+    options?: { days?: number; startDate?: string; endDate?: string }
+  ) {
     // await this.verifyAdmin(client, adminUserId);
-    return adminRepository.getDashboardMetrics(client);
+    return adminRepository.getDashboardMetrics(client, options);
   }
 
   /**

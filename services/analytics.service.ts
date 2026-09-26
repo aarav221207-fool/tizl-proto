@@ -70,7 +70,7 @@ export class AnalyticsService {
    * Record pageview or custom client event safely
    */
   async recordEvent(
-    client: SupabaseClient<Database>,
+    client: SupabaseClient<Database> | null | undefined,
     payload: {
       profileId?: string | null;
       visitorId?: string | null;
@@ -101,10 +101,21 @@ export class AnalyticsService {
    * Retrieve visitor metrics summary for admin dashboard
    */
   async getVisitorMetrics(
-    client: SupabaseClient<Database>,
-    days = 30
+    client?: SupabaseClient<Database> | null,
+    options?: number | { days?: number; startDate?: string; endDate?: string }
   ): Promise<VisitorAnalyticsSummary> {
-    return analyticsRepository.getVisitorAnalytics(client, days);
+    return analyticsRepository.getVisitorAnalytics(client, options);
+  }
+
+  /**
+   * Retrieve event timeline for admin analytics
+   */
+  async getEventTimeline(
+    client?: SupabaseClient<Database> | null,
+    limit = 50,
+    options?: { startDate?: string; endDate?: string; eventName?: string }
+  ) {
+    return analyticsRepository.getEventTimeline(client, limit, options);
   }
 }
 

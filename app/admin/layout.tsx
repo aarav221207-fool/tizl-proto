@@ -62,12 +62,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     let isMounted = true;
     async function verifyAdminAuth() {
       try {
-        const res = await fetch('/api/admin/me');
+        const res = await fetch('/api/admin/me', {
+          credentials: 'include',
+        });
         const json = await res.json();
 
         if (isMounted) {
-          if (res.status === 401) {
-            // Not authenticated -> redirect to /admin/login
+          if (res.status === 401 || (!res.ok && json.error?.code === 'UNAUTHORIZED')) {
+            try {
+              sessionStorage.removeItem('tizl_admin_token');
+            } catch {}
+            setAdminUser(null);
+            setIsUnauthorized(false);
             router.replace('/admin/login');
             return;
           }
@@ -103,32 +109,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      sessionStorage.removeItem('tizl_admin_token');
+    } catch {}
+    try {
+      await fetch('/api/admin/logout', { method: 'POST', credentials: 'include' });
     } catch {
-      // Ignore
+      try {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      } catch {}
     }
+    setAdminUser(null);
     router.push('/admin/login');
   };
 
   // If on /admin/login page, render children directly without admin layout wrapper
   if (isLoginPage) {
-    return (
-      <>
-        <head>
-          <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
-        </head>
-        {children}
-      </>
-    );
+    return <>{children}</>;
   }
 
   // Loading state during authorization verification
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4 font-sans">
-        <head>
-          <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
-        </head>
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-3 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
           <p className="text-xs text-slate-400 font-medium tracking-wide">
@@ -143,9 +145,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (isUnauthorized) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
-        <head>
-          <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
-        </head>
         <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center space-y-5 shadow-2xl relative z-10">
           <div className="inline-flex p-4 bg-rose-500/10 text-rose-400 rounded-2xl border border-rose-500/20">
             <Lock className="w-10 h-10" />
@@ -215,10 +214,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row font-sans">
-      <head>
-        <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
-      </head>
-
       {/* Sidebar Navigation */}
       <aside className="w-full md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0">
         <div>

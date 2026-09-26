@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { analyticsService } from '@/services/analytics.service';
 import { successResponse, errorResponse } from '@/lib/api-response';
 import { BadRequestError } from '@/lib/errors';
 
@@ -68,6 +69,33 @@ export async function POST(req: NextRequest) {
       }
     } catch (fetchErr) {
       console.error('Error fetching profile on login:', fetchErr);
+    }
+
+    // Record login activity event in database
+    try {
+      let clientForEvent;
+      try {
+        clientForEvent = createAdminClient();
+      } catch {
+        clientForEvent = supabase;
+      }
+
+      await analyticsService.recordEvent(clientForEvent, {
+        profileId: data.user.id,
+        eventName: 'login',
+        eventData: {
+          user_id: data.user.id,
+          role: userRole,
+          auth_provider: 'email',
+          email: data.user.email,
+          timestamp: new Date().toISOString(),
+        },
+        path: '/customer/login',
+        ipAddress: req.headers.get('x-forwarded-for')?.split(',')[0].trim() || req.headers.get('x-real-ip') || null,
+        userAgent: req.headers.get('user-agent'),
+      });
+    } catch (evtErr) {
+      console.error('[Auth Login] Failed to record login analytics event:', evtErr);
     }
 
     return successResponse({

@@ -41,20 +41,29 @@ export async function POST(req: NextRequest) {
       dbClient = await createClient();
     }
 
-    await analyticsService.recordEvent(dbClient, {
-      profileId,
-      visitorId,
-      eventName,
-      eventData,
-      path,
-      referrer,
-      userAgent,
-      ipAddress,
-    });
+    let recorded = null;
+    try {
+      recorded = await analyticsService.recordEvent(dbClient, {
+        profileId,
+        visitorId,
+        eventName,
+        eventData,
+        path,
+        referrer,
+        userAgent,
+        ipAddress,
+      });
+    } catch (recordErr: any) {
+      console.warn('[Analytics API] Non-fatal event record error:', recordErr?.message || recordErr);
+    }
 
-    return successResponse({ recorded: true });
+    return successResponse({
+      recorded: !!(recorded && recorded.id),
+      id: recorded?.id || null,
+    });
   } catch (err: any) {
-    return errorResponse(err);
+    console.warn('[Analytics API] Non-fatal error handling analytics event:', err?.message || err);
+    return successResponse({ recorded: false, warning: 'Analytics buffered' });
   }
 }
 

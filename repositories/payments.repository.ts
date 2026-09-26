@@ -1,6 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database, PaymentStatus } from '@/types/database';
 import { BaseRepository } from './base.repository';
+import { analyticsService } from '@/services/analytics.service';
 
 export class PaymentsRepository extends BaseRepository<'payments'> {
   constructor() {
@@ -20,6 +21,24 @@ export class PaymentsRepository extends BaseRepository<'payments'> {
     if (error || !data) {
       throw error || new Error('Failed to create payment record');
     }
+
+    // Record payment_initiated event
+    try {
+      await analyticsService.recordEvent(client, {
+        profileId: (paymentData as any).customer_id || null,
+        eventName: 'payment_initiated',
+        eventData: {
+          payment_id: data.id,
+          booking_id: paymentData.booking_id,
+          amount: paymentData.amount,
+          currency: paymentData.currency,
+          provider: paymentData.provider,
+          status: paymentData.status,
+          provider_order_id: paymentData.provider_order_id,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch {}
 
     return data;
   }
@@ -89,6 +108,32 @@ export class PaymentsRepository extends BaseRepository<'payments'> {
     if (error || !data) {
       throw error || new Error('Failed to update payment status');
     }
+
+    // Record payment completion / failure / update event
+    try {
+      const evtName =
+        status === 'captured' || (status as string) === 'completed' || (status as string) === 'success'
+          ? 'payment_completed'
+          : status === 'failed'
+          ? 'payment_failed'
+          : 'payment_status_changed';
+
+      await analyticsService.recordEvent(client, {
+        profileId: (data as any).customer_id || null,
+        eventName: evtName,
+        eventData: {
+          payment_id: paymentId,
+          booking_id: data.booking_id,
+          amount: data.amount,
+          currency: data.currency,
+          provider: data.provider,
+          status,
+          provider_payment_id: updateData?.providerPaymentId || null,
+          method: updateData?.method || null,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch {}
 
     return data;
   }

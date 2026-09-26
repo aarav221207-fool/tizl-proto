@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { successResponse, errorResponse } from '@/lib/api-response';
@@ -99,10 +100,27 @@ export async function POST(req: NextRequest) {
       { designation: 'super_admin', profile_id: userId }
     );
 
-    return successResponse({
+    const cookieStore = await cookies();
+    const isProduction = process.env.NODE_ENV === 'production';
+    const response = successResponse({
       message: 'First Super Admin successfully initialized. Bootstrap route is now permanently disabled.',
       superAdmin: newSuperAdmin,
     });
+
+    try {
+      cookieStore.getAll().forEach((c) => {
+        if (c.name.startsWith('sb-') || c.name.includes('auth') || c.name.startsWith('admin_')) {
+          response.cookies.set(c.name, c.value, {
+            path: '/',
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: isProduction,
+          });
+        }
+      });
+    } catch {}
+
+    return response;
   } catch (err: any) {
     console.error('[Admin Bootstrap API] Error:', {
       message: err?.message || String(err),

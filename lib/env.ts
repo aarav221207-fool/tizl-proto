@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().default('https://tizl.in'),
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url().default('https://placeholder-project.supabase.co'),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1).default('placeholder-anon-key'),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().optional().default('placeholder-service-role-key'),
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional().default(''),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional().default(''),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional().default(''),
   
   PAYTM_MID: z.string().optional().default(''),
   PAYTM_MERCHANT_KEY: z.string().optional().default(''),

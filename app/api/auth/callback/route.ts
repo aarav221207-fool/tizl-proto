@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { analyticsService } from '@/services/analytics.service';
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -86,6 +87,46 @@ export async function GET(request: Request) {
         } catch {
           await supabase.from('profiles').insert(newProfile);
         }
+      }
+
+      // Record activity events in database
+      try {
+        let clientForEvent;
+        try {
+          clientForEvent = createAdminClient();
+        } catch {
+          clientForEvent = supabase;
+        }
+
+        if (!isExistingProfile) {
+          await analyticsService.recordEvent(clientForEvent, {
+            profileId: user.id,
+            eventName: 'signup',
+            eventData: {
+              user_id: user.id,
+              role: userRole,
+              auth_provider: 'google',
+              email: user.email,
+              timestamp: new Date().toISOString(),
+            },
+            path: '/auth/callback',
+          });
+        }
+
+        await analyticsService.recordEvent(clientForEvent, {
+          profileId: user.id,
+          eventName: 'login',
+          eventData: {
+            user_id: user.id,
+            role: userRole,
+            auth_provider: 'google',
+            email: user.email,
+            timestamp: new Date().toISOString(),
+          },
+          path: '/auth/callback',
+        });
+      } catch (evtErr) {
+        console.error('[OAuth Callback] Failed to record analytics event:', evtErr);
       }
     } catch (profErr) {
       console.error('Error synchronizing OAuth profile:', profErr);

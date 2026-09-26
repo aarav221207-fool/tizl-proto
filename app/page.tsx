@@ -94,14 +94,26 @@ export default function HomePage() {
   // Booking Modal State
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [bStep, setBStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [confirmedBooking, setConfirmedBooking] = useState<any>(null);
+
+  // Dynamic database lists
+  const [serverServices, setServerServices] = useState<any[]>([]);
+  const [serverCities, setServerCities] = useState<string[]>([]);
+  const [availableCooks, setAvailableCooks] = useState<any[]>([]);
+
   const [booking, setBooking] = useState<{
     need: string | null;
+    serviceId?: string;
     date: string;
     time: string;
     duration: string | null;
     city: string | null;
     cook: string | null;
+    cookId: string | null;
     headcount: number;
+    notes?: string;
     bookingId?: string;
   }>({
     need: null,
@@ -110,27 +122,68 @@ export default function HomePage() {
     duration: null,
     city: null,
     cook: null,
+    cookId: null,
     headcount: 2,
+    notes: '',
   });
 
   const servicesScrollRef = useRef<HTMLDivElement>(null);
 
-  const openBookingModal = useCallback((needId?: string) => {
+  // Fetch real services, cities, and verified cooks from database
+  useEffect(() => {
+    let mounted = true;
+    async function loadCatalog() {
+      try {
+        const [sRes, cRes] = await Promise.all([
+          fetch('/api/services').then((r) => r.json()).catch(() => null),
+          fetch('/api/cooks').then((r) => r.json()).catch(() => null),
+        ]);
+        if (!mounted) return;
+        if (sRes?.data?.services?.length) {
+          setServerServices(sRes.data.services);
+        }
+        if (sRes?.data?.cities?.length) {
+          setServerCities(sRes.data.cities.map((c: any) => c.name));
+        }
+        if (cRes?.data?.cooks?.length) {
+          setAvailableCooks(cRes.data.cooks);
+        }
+      } catch (err) {
+        console.warn('Could not load dynamic database catalog:', err);
+      }
+    }
+    loadCatalog();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const openBookingModal = useCallback((needId?: string, initialCity?: string) => {
     if (!isAuthenticated) {
-      router.push(`/customer/login?redirect=${encodeURIComponent(needId ? `/?book=true&need=${needId}` : '/?book=true')}`);
+      const q = new URLSearchParams();
+      q.set('book', 'true');
+      if (needId) q.set('need', needId);
+      if (initialCity) q.set('city', initialCity);
+      router.push(`/customer/login?redirect=${encodeURIComponent(`/?${q.toString()}`)}`);
       return;
     }
+
+    setBookingError(null);
+    setConfirmedBooking(null);
+    setIsSubmitting(false);
 
     setBooking({
       need: needId || null,
       date: new Date().toISOString().slice(0, 10),
       time: '12:30',
       duration: '2',
-      city: 'Delhi NCR',
+      city: initialCity || 'Delhi',
       cook: null,
+      cookId: null,
       headcount: 2,
+      notes: '',
     });
-    setBStep(1);
+    setBStep(needId ? 2 : 1);
     setIsBookingOpen(true);
   }, [isAuthenticated, router]);
 
@@ -138,11 +191,12 @@ export default function HomePage() {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('book') === 'true' && isAuthenticated) {
-        const need = urlParams.get('need') || undefined;
+        const need = urlParams.get('need') || urlParams.get('service') || undefined;
+        const city = urlParams.get('city') || undefined;
         // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
         const timer = setTimeout(() => {
-          openBookingModal(need);
+          openBookingModal(need, city);
         }, 0);
         return () => clearTimeout(timer);
       }
@@ -150,46 +204,71 @@ export default function HomePage() {
   }, [isAuthenticated, openBookingModal]);
 
   const handleBookingNext = async () => {
-    if (bStep < 4) {
-      if (bStep === 3) {
-        const fallbackId = 'TIZL-' + Math.random().toString(36).slice(2, 8).toUpperCase();
-        setBooking(prev => ({ ...prev, bookingId: fallbackId }));
-        
-        // Asynchronously persist real booking into Supabase if authenticated
-        try {
-          const res = await fetch('/api/bookings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              service_id: booking.need || 'lunch',
-              address_id: 'default',
-              booking_date: booking.date || new Date().toISOString().slice(0, 10),
-              start_time: booking.time || '12:30',
-              duration_hours: parseInt(booking.duration || '2') || 2,
-              guest_count: booking.headcount || 2,
-              cooking_notes: `Preferred Cook: ${booking.cook || 'Any Verified Cook'}. City: ${booking.city || 'Delhi NCR'}.`,
-            }),
-          });
-          const data = await res.json();
-          if (data.success && data.data?.booking?.booking_number) {
-            setBooking(prev => ({ ...prev, bookingId: data.data.booking.booking_number }));
-          }
-        } catch (e) {
-          console.error('Error recording booking to database:', e);
+    if (bStep === 3) {
+      // Step 3 -> Confirm booking: Execute REAL database API call
+      setIsSubmitting(true);
+      setBookingError(null);
+
+      try {
+        // Resolve service ID from real catalog or fallback
+        const matchedService = serverServices.find(
+          (s) =>
+            s.id === booking.need ||
+            s.name.toLowerCase().includes((booking.need || '').toLowerCase())
+        );
+        const serviceIdToUse = matchedService?.id || booking.need || 'lunch';
+
+        const res = await fetch('/api/bookings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            service_id: serviceIdToUse,
+            address_id: 'default',
+            booking_date: booking.date || new Date().toISOString().slice(0, 10),
+            start_time: booking.time || '12:30',
+            duration_hours: parseInt(booking.duration || '2') || 2,
+            guest_count: booking.headcount || 2,
+            cook_id: booking.cookId || undefined,
+            cooking_notes: `Preferred Cook: ${booking.cook || 'Auto-match'}. City: ${booking.city || 'Delhi NCR'}.${booking.notes ? ` Notes: ${booking.notes}` : ''}`,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          throw new Error(data.error?.message || 'Failed to confirm booking. Please try again.');
         }
+
+        const realBooking = data.data?.booking;
+        setConfirmedBooking(realBooking);
+        setBooking((prev) => ({
+          ...prev,
+          bookingId: realBooking?.booking_number || realBooking?.id,
+        }));
+        setBStep(4);
+      } catch (err: any) {
+        console.error('[Booking Modal] Creation failed:', err);
+        setBookingError(err?.message || 'An error occurred while creating your booking. Please try again.');
+      } finally {
+        setIsSubmitting(false);
       }
-      setBStep(prev => prev + 1);
+      return;
+    }
+
+    if (bStep < 4) {
+      setBStep((prev) => prev + 1);
     }
   };
 
   const handleBookingBack = () => {
     if (bStep > 1) {
-      setBStep(prev => prev - 1);
+      setBookingError(null);
+      setBStep((prev) => prev - 1);
     }
   };
 
   const isBNextEnabled = () => {
-
+    if (isSubmitting) return false;
     if (bStep === 1) return !!booking.need;
     if (bStep === 2) return !!(booking.date && booking.time && booking.duration && booking.city);
     if (bStep === 3) return !!booking.cook;
@@ -207,7 +286,7 @@ export default function HomePage() {
             <div className="nav-item"><a href="#why-us">Why us</a></div>
             <div className="nav-item">
               <button type="button">Services <span className="caret">▾</span></button>
-              <div className="mega">
+              <div className="mega" style={{ minWidth: '240px' }}>
                 <a href="#" onClick={(e) => { e.preventDefault(); openBookingModal('breakfast'); }}>Breakfast</a>
                 <a href="#" onClick={(e) => { e.preventDefault(); openBookingModal('lunch'); }}>Lunch / Lunch Prep</a>
                 <a href="#" onClick={(e) => { e.preventDefault(); openBookingModal('dinner'); }}>Dinner</a>
@@ -223,10 +302,13 @@ export default function HomePage() {
             </div>
             <div className="nav-item">
               <button type="button">Cities <span className="caret">▾</span></button>
-              <div className="mega">
-                <a href="#cities">Delhi NCR</a><a href="#cities">Noida</a>
-                <a href="#cities">Gurugram</a><a href="#cities">Bangalore</a>
-                <a href="#cities">Mumbai</a><a href="#cities">Hyderabad</a>
+              <div className="mega" style={{ minWidth: '220px' }}>
+                <a href="#cities">Delhi NCR</a>
+                <a href="#cities">Noida</a>
+                <a href="#cities">Gurugram</a>
+                <a href="#cities">Bangalore</a>
+                <a href="#cities">Mumbai</a>
+                <a href="#cities">Hyderabad</a>
                 <a className="view-all" href="#cities">View all cities →</a>
               </div>
             </div>
@@ -237,7 +319,7 @@ export default function HomePage() {
             {!isAuthenticated && (
               <>
                 <Link href="/customer/login" className="btn btn-ghost btn-small font-semibold">Login</Link>
-                <Link href="/customer/signup" className="btn btn-ghost btn-small font-semibold">Sign Up</Link>
+                <Link href="/customer/signup" className="btn btn-ghost btn-small font-semibold hidden sm:inline-flex">Sign Up</Link>
               </>
             )}
             
@@ -508,48 +590,71 @@ export default function HomePage() {
       <footer>
         <div className="wrap">
           <div className="footer-top">
-            <div style={{ maxWidth: '240px' }}>
-              <div className="logo-chip" style={{ marginBottom: '10px' }}>
-                {LOGO_SVG}
+            <div style={{ maxWidth: '260px' }}>
+              <div className="logo-chip" style={{ marginBottom: '14px' }}>
+                <Link href="/" aria-label="Tizl Home">
+                  {LOGO_SVG}
+                </Link>
               </div>
-              <p style={{ fontSize: '13px', lineHeight: '1.6' }}>Book a Cook in 10 Minutes. Aadhaar &amp; police-verified cooks.</p>
+              <p style={{ fontSize: '13px', lineHeight: '1.6', color: '#AEB3C7' }}>
+                Book a Cook in 10 Minutes. Aadhaar &amp; police-verified cooks for daily meals, weekly prep, and celebrations.
+              </p>
+              <div style={{ marginTop: '16px' }}>
+                <button
+                  type="button"
+                  onClick={() => openBookingModal()}
+                  className="btn btn-primary btn-small"
+                  style={{ background: 'var(--blue)', color: '#fff', fontSize: '12px', padding: '8px 16px' }}
+                >
+                  Book a cook now →
+                </button>
+              </div>
             </div>
             <div className="footer-cols">
               <div className="footer-col">
-                <h4>Support</h4>
-                <a href="#faqs">Contact us</a>
-                <a href="#faqs">FAQs</a>
-                <a href="#">Delete account</a>
+                <h4>Explore</h4>
+                <Link href="/how-it-works">How it works</Link>
+                <Link href="/about">About Tizl</Link>
+                <Link href="/faq">FAQs</Link>
+                <Link href="/contact">Contact &amp; Support</Link>
               </div>
               <div className="footer-col">
-                <h4>Company</h4>
-                <a href="#why-us">Why Tizl</a>
-                <a href="#cities">Request Tizl in your locality</a>
+                <h4>Services</h4>
+                <Link href="/services/daily-home-cooking">Daily Home Cooking</Link>
+                <Link href="/services/breakfast-service">Breakfast Service</Link>
+                <Link href="/services/dinner-service">Dinner Service</Link>
+                <Link href="/services/party-cooking">Party Cooking</Link>
+                <Link href="/services/weekly-meal-prep">Weekly Meal Prep</Link>
+                <Link href="/services/festival-cooking">Festival Cooking</Link>
               </div>
               <div className="footer-col">
-                <h4>Legal</h4>
-                <a href="#">Terms &amp; Conditions</a>
-                <a href="#">Privacy Policy</a>
-                <a href="#">Cancellation Policy</a>
+                <h4>Cities</h4>
+                <Link href="/cooks/delhi">Delhi NCR</Link>
+                <Link href="/cooks/mumbai">Mumbai</Link>
+                <Link href="/cooks/bengaluru">Bengaluru</Link>
+                <Link href="/cooks/hyderabad">Hyderabad</Link>
+                <Link href="/cooks/pune">Pune</Link>
+                <Link href="/cooks/chennai">Chennai</Link>
               </div>
               <div className="footer-col">
-                <h4>All services</h4>
-                <a href="#" onClick={(e) => { e.preventDefault(); openBookingModal('breakfast'); }}>Breakfast</a>
-                <a href="#" onClick={(e) => { e.preventDefault(); openBookingModal('lunch'); }}>Lunch Prep</a>
-                <a href="#" onClick={(e) => { e.preventDefault(); openBookingModal('party'); }}>Party Cooking</a>
-                <a href="#" onClick={(e) => { e.preventDefault(); openBookingModal('senior'); }}>Senior Care Meals</a>
+                <h4>Cook Partners</h4>
+                <Link href="/partner/signup">Become a Cook</Link>
+                <Link href="/partner/login">Partner Login</Link>
+                <Link href="/partner/verification">Verification Status</Link>
+                <Link href="/contact?topic=partner">Partner Support</Link>
               </div>
               <div className="footer-col">
-                <h4>All cities</h4>
-                <a href="#cities">Delhi NCR</a>
-                <a href="#cities">Noida · Gurugram</a>
-                <a href="#cities">Bangalore</a>
-                <a href="#cities">Mumbai · Hyderabad</a>
+                <h4>Customer</h4>
+                <Link href="/customer/login">Customer Login</Link>
+                <Link href="/customer/signup">Create Account</Link>
+                <Link href="/customer/dashboard">My Bookings</Link>
+                <Link href="/faq#cancellation">Cancellation Policy</Link>
+                <Link href="/faq#safety">Safety &amp; Verification</Link>
               </div>
             </div>
           </div>
           <div className="footer-bottom">
-            <span>Tizl © 2026</span>
+            <span>Tizl © 2026. All rights reserved. On-demand home cook platform.</span>
             <div className="social-row"><span>Instagram</span><span>LinkedIn</span><span>YouTube</span></div>
           </div>
         </div>
@@ -637,7 +742,7 @@ export default function HomePage() {
                 <div className="field-group">
                   <label>City</label>
                   <div className="option-grid">
-                    {CITIES.map(c => (
+                    {(serverCities.length > 0 ? serverCities : CITIES).map(c => (
                       <button
                         key={c}
                         type="button"
@@ -650,27 +755,66 @@ export default function HomePage() {
                     ))}
                   </div>
                 </div>
+                <div className="field-group">
+                  <label>Cooking instructions / dietary notes (optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Less spicy, vegetarian, or allergy notes"
+                    value={booking.notes || ''}
+                    onChange={(e) => setBooking(prev => ({ ...prev, notes: e.target.value }))}
+                  />
+                </div>
               </div>
             )}
 
             {bStep === 3 && (
               <div>
+                {bookingError && (
+                  <div style={{ padding: '10px 14px', marginBottom: '14px', borderRadius: '8px', background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', fontSize: '13px' }}>
+                    {bookingError}
+                  </div>
+                )}
                 <div className="field-group">
-                  <label>Available cooks near you</label>
+                  <label>Select preferred cook</label>
                   <div>
-                    {COOKS.map(c => (
-                      <div
-                        key={c.name}
-                        className={`cook-card ${booking.cook === c.name ? 'selected' : ''}`}
-                        onClick={() => setBooking(prev => ({ ...prev, cook: c.name }))}
-                      >
-                        <div className="cook-avatar">{c.initials}</div>
-                        <div className="cook-info">
-                          <div className="name">{c.name} <span className="verified-badge">✓ Verified</span></div>
-                          <div className="meta">{c.meta} · ⭐ {c.rating}</div>
-                        </div>
+                    {/* Auto-match option */}
+                    <div
+                      className={`cook-card ${booking.cook === 'Auto-match verified cook' ? 'selected' : ''}`}
+                      onClick={() => setBooking(prev => ({ ...prev, cook: 'Auto-match verified cook', cookId: null }))}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className="cook-avatar" style={{ background: 'var(--blue)', color: '#fff' }}>⚡</div>
+                      <div className="cook-info">
+                        <div className="name">Auto-match verified cook <span className="verified-badge">✓ Fastest</span></div>
+                        <div className="meta">Our algorithm pairs the nearest available verified partner</div>
                       </div>
-                    ))}
+                    </div>
+
+                    {/* Dynamic or platform verified cooks */}
+                    {(availableCooks.length > 0 ? availableCooks : COOKS).map((c: any) => {
+                      const cName = c.display_name || c.name || c.profile?.full_name || 'Verified Cook';
+                      const cId = c.id || null;
+                      const cInitials = (c.initials || cName.slice(0, 2)).toUpperCase();
+                      const cMeta = c.specialties 
+                        ? (Array.isArray(c.specialties) ? c.specialties.join(', ') : c.specialties)
+                        : (c.meta || 'Verified Professional Cook');
+                      const cRating = c.rating_avg || c.rating || '4.9';
+
+                      return (
+                        <div
+                          key={cId || cName}
+                          className={`cook-card ${booking.cook === cName ? 'selected' : ''}`}
+                          onClick={() => setBooking(prev => ({ ...prev, cook: cName, cookId: cId }))}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <div className="cook-avatar">{cInitials}</div>
+                          <div className="cook-info">
+                            <div className="name">{cName} <span className="verified-badge">✓ Verified</span></div>
+                            <div className="meta">{cMeta} · ⭐ {cRating}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -681,19 +825,28 @@ export default function HomePage() {
                 <div className="success-box">
                   <div className="success-icon">✓</div>
                   <h3>Booking confirmed</h3>
-                  <span className="status-badge success">● Confirmed</span>
+                  <span className="status-badge success">
+                    ● {confirmedBooking?.status ? confirmedBooking.status.replace(/_/g, ' ').toUpperCase() : 'CONFIRMED'}
+                  </span>
                   <p style={{ marginTop: '14px' }}>
-                    {booking.cook} will arrive on {booking.date || 'your chosen date'} at {booking.time} for {NEEDS.find(n => n.id === booking.need)?.lb.toLowerCase() || 'your booking'} · {booking.headcount} people in {booking.city}.
+                    {booking.cook} will arrive on {confirmedBooking?.booking_date || booking.date} at {confirmedBooking?.start_time || booking.time} for {NEEDS.find(n => n.id === booking.need)?.lb.toLowerCase() || 'your booking'} · {confirmedBooking?.guest_count || booking.headcount} people in {booking.city}.
                   </p>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '18px', textAlign: 'left' }}>
                     <span>Duration</span>
-                    <span>{DURATIONS.find(x => x.id === booking.duration)?.len || ''}</span>
+                    <span>{confirmedBooking?.duration_hours ? `${confirmedBooking.duration_hours} hr` : (DURATIONS.find(x => x.id === booking.duration)?.len || '')}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700', color: 'var(--blue)' }}>
-                    <span>Total</span>
-                    <span>₹{DURATIONS.find(x => x.id === booking.duration)?.amt || ''}</span>
+                    <span>Total Amount</span>
+                    <span>₹{confirmedBooking?.total_amount || (DURATIONS.find(x => x.id === booking.duration)?.amt || '')}</span>
                   </div>
-                  <span className="booking-id">{booking.bookingId}</span>
+                  <div style={{ marginTop: '14px' }}>
+                    <span className="booking-id">{confirmedBooking?.booking_number || booking.bookingId}</span>
+                  </div>
+                  <div style={{ marginTop: '18px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                    <Link href="/customer/dashboard" className="btn btn-primary btn-small">
+                      View in My Bookings
+                    </Link>
+                  </div>
                 </div>
               </div>
             )}
@@ -701,7 +854,7 @@ export default function HomePage() {
 
           <div className="modal-footer">
             {bStep > 1 && bStep < 4 ? (
-              <button type="button" className="btn btn-ghost btn-small" onClick={handleBookingBack}>Back</button>
+              <button type="button" className="btn btn-ghost btn-small" onClick={handleBookingBack} disabled={isSubmitting}>Back</button>
             ) : (
               <span></span>
             )}
@@ -713,7 +866,7 @@ export default function HomePage() {
                 style={!isBNextEnabled() ? { opacity: 0.4, cursor: 'not-allowed' } : {}}
                 onClick={handleBookingNext}
               >
-                {bStep === 3 ? 'Confirm booking' : 'Continue'}
+                {bStep === 3 ? (isSubmitting ? 'Confirming booking...' : 'Confirm booking') : 'Continue'}
               </button>
             ) : (
               <button type="button" className="btn btn-primary btn-small" onClick={() => setIsBookingOpen(false)}>Done</button>

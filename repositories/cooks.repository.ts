@@ -43,10 +43,18 @@ export class CooksRepository extends BaseRepository<'cooks'> {
 
     if (profilesRes.error) throw profilesRes.error;
 
-    const profiles = profilesRes.data || [];
+    const profiles = [...(profilesRes.data || [])];
     const cooksList = cooksRes.data || [];
     const bookings = bookingsRes.data || [];
     const reviews = reviewsRes.data || [];
+
+    // Ensure cooks in cooks table with non-cook or pending profiles are also included
+    const cookProfileIds = cooksList.map((c) => c.profile_id).filter(Boolean) as string[];
+    const missingProfileIds = cookProfileIds.filter((id) => !profiles.some((p) => p.id === id));
+    if (missingProfileIds.length > 0) {
+      const { data: missingProfiles } = await client.from('profiles').select('*').in('id', missingProfileIds);
+      if (missingProfiles) profiles.push(...missingProfiles);
+    }
 
     // Aggregate booking stats per cook (using bookings.cook_id -> cooks.id)
     const cookStatsMap = new Map<

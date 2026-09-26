@@ -3,8 +3,17 @@ import { cookies } from 'next/headers';
 
 export async function createClient() {
   const cookieStore = await cookies();
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder-project.supabase.co';
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key';
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (
+    !supabaseUrl ||
+    !supabaseAnonKey ||
+    supabaseUrl.includes('placeholder') ||
+    supabaseAnonKey.includes('placeholder')
+  ) {
+    throw new Error('Supabase is not configured: valid NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required.');
+  }
 
   return createServerClient(
     supabaseUrl,
@@ -16,8 +25,14 @@ export async function createClient() {
         },
         setAll(cookiesToSet) {
           try {
+            const isProduction = process.env.NODE_ENV === 'production';
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, {
+                path: '/',
+                sameSite: 'lax',
+                ...options,
+                secure: options?.secure !== undefined ? options.secure : isProduction,
+              })
             );
           } catch {
             // The `setAll` method was called from a Server Component.
