@@ -22,7 +22,8 @@ const FALLBACK_SERVICES = [
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://tizl.in';
+  const baseUrl = 'https://www.tizl.in';
+
   const lastModified = new Date();
 
   const routes: MetadataRoute.Sitemap = [
