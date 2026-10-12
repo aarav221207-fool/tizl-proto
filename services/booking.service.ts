@@ -46,13 +46,15 @@ export class BookingService {
     customerId: string,
     data: {
       service_id: string;
-      address_id: string;
+      address_id?: string;
+      address_text?: string;
       booking_date: string;
       start_time: string;
       duration_hours: number;
       guest_count?: number;
       cooking_notes?: string;
       cook_id?: string | null;
+      client_request_id?: string;
     }
   ) {
     if (!data.booking_date || !data.start_time || !data.duration_hours) {
@@ -88,15 +90,25 @@ export class BookingService {
       if (addresses.length > 0) {
         addressId = addresses[0].id;
       } else {
+        const addrText = data.address_text || 'Delhi NCR';
+        const parts = addrText.split(',').map((p) => p.trim());
+        const locality = parts[parts.length - 1] || 'Delhi NCR';
+        const street = parts.slice(0, -1).join(', ') || parts[0] || 'Main Location';
         const newAddr = await addressesRepository.createAddress(client, {
           customer_id: customerId,
           title: 'Home',
           house_number: '1',
-          street: 'Main Street',
-          locality: 'Delhi NCR',
+          street: street.slice(0, 100),
+          locality: locality.slice(0, 100),
           is_default: true,
         });
         addressId = newAddr.id;
+      }
+    } else {
+      // Validate that the provided address belongs to the customer
+      const existingAddr = await addressesRepository.getAddressById(client, addressId, customerId);
+      if (!existingAddr || existingAddr.customer_id !== customerId) {
+        throw new BadRequestError('Invalid or unauthorized address ID');
       }
     }
 

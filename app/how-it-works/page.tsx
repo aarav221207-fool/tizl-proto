@@ -268,8 +268,8 @@ export default function HowItWorksPage() {
               <p>Compare the on-demand Tizl experience with hiring directly or ordering restaurant takeout.</p>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse border border-[var(--line)] rounded-xl overflow-hidden">
+            <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+              <table className="w-full text-left border-collapse border border-[var(--line)] rounded-xl overflow-hidden min-w-[640px]">
                 <thead>
                   <tr className="bg-[var(--surface)] text-[var(--ink)] border-b border-[var(--line)] text-sm">
                     <th className="p-4 font-bold">Feature</th>

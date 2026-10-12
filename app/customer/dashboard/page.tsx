@@ -4,6 +4,8 @@ import React, { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
+import { SiteHeader } from '@/components/SiteHeader';
+import { SiteFooter } from '@/components/SiteFooter';
 
 type BookingItem = {
   id: string;
@@ -41,7 +43,8 @@ function CustomerDashboardContent() {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loadingData, setLoadingData] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'bookings' | 'addresses' | 'payments' | 'support' | 'profile'>('bookings');
+  const [bookingFilter, setBookingFilter] = useState<'all' | 'active' | 'completed'>('all');
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -63,7 +66,6 @@ function CustomerDashboardContent() {
         })
         .catch((err) => {
           console.error(err);
-          setError(err.message);
         })
         .finally(() => {
           setLoadingData(false);
@@ -73,9 +75,9 @@ function CustomerDashboardContent() {
 
   if (isLoading || loadingData) {
     return (
-      <div className="min-h-screen bg-[var(--paper)] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-[var(--blue)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+      <div className="min-h-screen flex items-center justify-center bg-[var(--paper)]">
+        <div className="text-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--blue)] mx-auto mb-4" />
           <p className="text-sm font-medium text-[var(--text-dim)]">Loading your bookings...</p>
         </div>
       </div>
@@ -86,151 +88,281 @@ function CustomerDashboardContent() {
     (item, index, self) => index === self.findIndex((b) => b.id === item.id)
   );
 
+  const filteredBookings = allBookings.filter((b) => {
+    if (bookingFilter === 'active') return b.status !== 'completed' && b.status !== 'cancelled';
+    if (bookingFilter === 'completed') return b.status === 'completed';
+    return true;
+  });
+
+  const nextBooking = allBookings.find((b) => b.status !== 'completed' && b.status !== 'cancelled');
+
   return (
-    <div className="min-h-screen bg-[var(--paper)] flex flex-col font-sans">
-      <header className="site-header" style={{ position: 'sticky', top: 0, zIndex: 80, background: '#fff', borderBottom: '1px solid var(--line)' }}>
-        <div className="wrap flex items-center justify-between h-[78px]">
-          <div className="flex items-center gap-6">
-            <Link href="/" className="logo text-[#0F1736] font-bold text-2xl flex items-center gap-1">
-              <span className="text-[#2E46E0]">Ti</span>zl
-            </Link>
-            <span className="hidden sm:inline-block pl-4 border-l border-gray-200 text-xs font-semibold uppercase tracking-wider text-[var(--text-dim)]">
-              Customer Account
-            </span>
-          </div>
+    <div className="min-h-screen bg-[var(--surface)] flex flex-col font-sans">
+      <SiteHeader onOpenBooking={() => router.push('/?book=true')} />
 
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-sm font-medium text-[var(--text-dim)] hover:text-[var(--ink)]">
-              Home
-            </Link>
-            <Link href="/?book=true" className="btn btn-primary btn-small">
-              Book a cook
-            </Link>
-            <button
-              onClick={() => logout()}
-              className="btn btn-ghost btn-small font-medium"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="wrap py-10 flex-1">
-        {/* Welcome banner */}
-        <div className="bg-white border border-[var(--line)] rounded-2xl p-6 sm:p-8 mb-8 shadow-sm">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <main className="dashboard open flex-1">
+        <div className="wrap">
+          {/* Header row */}
+          <div className="dash-head">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-[var(--ink)]">
-                Welcome back, {data?.profile?.full_name || user?.fullName || 'Customer'}
+              <h1>
+                Good day, {data?.profile?.full_name || user?.fullName?.split(' ')[0] || 'Customer'}.
               </h1>
-              <p className="text-sm text-[var(--text-dim)] mt-1">
-                {data?.profile?.email || user?.email} · {data?.profile?.phone || 'Verified Customer'}
-              </p>
+              <p>What are we cooking today?</p>
             </div>
-            <Link
-              href="/?book=true"
-              className="btn btn-primary btn-small shadow-sm"
-            >
-              + Book a new cook
+            <Link href="/?book=true" className="btn btn-primary">
+              Book a Cook <span className="arrow">→</span>
             </Link>
           </div>
-        </div>
 
-        {/* Metrics Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
-          <div className="bg-white border border-[var(--line)] rounded-2xl p-6 shadow-sm">
-            <div className="text-xs uppercase font-mono tracking-wider text-[var(--text-dim)] mb-2">Total Bookings</div>
-            <div className="text-3xl font-bold text-[var(--ink)]">{data?.metrics?.totalBookings ?? allBookings.length}</div>
-          </div>
-          <div className="bg-white border border-[var(--line)] rounded-2xl p-6 shadow-sm">
-            <div className="text-xs uppercase font-mono tracking-wider text-[var(--text-dim)] mb-2">Active Bookings</div>
-            <div className="text-3xl font-bold text-[var(--blue)]">{data?.metrics?.activeBookingsCount ?? (data?.activeBookings?.length || 0)}</div>
-          </div>
-          <div className="bg-white border border-[var(--line)] rounded-2xl p-6 shadow-sm">
-            <div className="text-xs uppercase font-mono tracking-wider text-[var(--text-dim)] mb-2">Completed Cooks</div>
-            <div className="text-3xl font-bold text-[var(--ink)]">{data?.metrics?.completedBookingsCount ?? 0}</div>
-          </div>
-        </div>
-
-        {/* Bookings Section */}
-        <div className="bg-white border border-[var(--line)] rounded-2xl p-6 sm:p-8 shadow-sm">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-[var(--ink)]">Your Bookings</h2>
-            <span className="text-xs font-mono text-[var(--text-dim)]">{allBookings.length} total</span>
-          </div>
-
-          {allBookings.length === 0 ? (
-            <div className="text-center py-16 px-4">
-              <div className="w-16 h-16 bg-[var(--surface)] text-3xl rounded-full flex items-center justify-center mx-auto mb-4">
-                🍳
+          {/* Next booking banner */}
+          {nextBooking && (
+            <div className="next-booking-card mt-6">
+              <div>
+                <div className="eyebrow">Upcoming cook scheduled</div>
+                <h3>{nextBooking.services?.name || 'Home Cook'} · {nextBooking.booking_date}</h3>
+                <div className="meta">
+                  Slot: {nextBooking.start_time} · {nextBooking.guest_count} people · Booking ID: {nextBooking.booking_number}
+                  {nextBooking.otp && <span> · Start OTP: <strong>{nextBooking.otp}</strong></span>}
+                </div>
               </div>
-              <h3 className="text-lg font-bold text-[var(--ink)] mb-2">No bookings yet</h3>
-              <p className="text-sm text-[var(--text-dim)] max-w-sm mx-auto mb-6">
-                Book your first verified Tizl cook in just a few clicks. Transparent hourly pricing and instant confirmation.
-              </p>
-              <Link href="/?book=true" className="btn btn-primary btn-small">
-                Book a Cook Now
-              </Link>
+              <div className="actions">
+                <span className="status-badge success">Confirmed</span>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {allBookings.map((b) => (
-                <div
-                  key={b.id}
-                  className="border border-[var(--line)] rounded-xl p-5 hover:border-[var(--blue)] transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
-                >
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="font-mono font-bold text-sm text-[var(--ink)]">
-                        {b.booking_number}
-                      </span>
-                      <span
-                        className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                          b.status === 'completed'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : b.status === 'cancelled'
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                            : 'bg-blue-50 text-blue-700 border border-blue-200'
-                        }`}
-                      >
-                        ● {b.status.replace(/_/g, ' ')}
-                      </span>
-                      {b.otp && b.status !== 'completed' && b.status !== 'cancelled' && (
-                        <span className="text-xs font-mono bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded">
-                          OTP: <strong>{b.otp}</strong>
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-sm text-[var(--ink)] font-medium">
-                      {b.services?.name || b.services?.title || 'Cook Service'} · {b.duration_hours} hr{b.duration_hours > 1 ? 's' : ''} for {b.guest_count} people
-                    </div>
-                    <div className="text-xs text-[var(--text-dim)]">
-                      Date: {b.booking_date} at {b.start_time} · {b.cooking_notes || 'Assigned verified cook'}
-                    </div>
+          )}
+
+          {/* Grid layout */}
+          <div className="dash-grid">
+            {/* Sidebar navigation */}
+            <div className="dash-nav">
+              <button
+                className={activeTab === 'bookings' ? 'on' : ''}
+                onClick={() => setActiveTab('bookings')}
+              >
+                Bookings
+              </button>
+              <button
+                className={activeTab === 'addresses' ? 'on' : ''}
+                onClick={() => setActiveTab('addresses')}
+              >
+                Saved Addresses
+              </button>
+              <button
+                className={activeTab === 'payments' ? 'on' : ''}
+                onClick={() => setActiveTab('payments')}
+              >
+                Payments
+              </button>
+              <button
+                className={activeTab === 'support' ? 'on' : ''}
+                onClick={() => setActiveTab('support')}
+              >
+                Help &amp; Support
+              </button>
+              <button
+                className={activeTab === 'profile' ? 'on' : ''}
+                onClick={() => setActiveTab('profile')}
+              >
+                My Profile
+              </button>
+              <button onClick={() => logout()}>Logout</button>
+            </div>
+
+            {/* Main content pane */}
+            <div>
+              {/* BOOKINGS PANE */}
+              {activeTab === 'bookings' && (
+                <div>
+                  <div className="tab-row-dash">
+                    <button
+                      className={bookingFilter === 'all' ? 'on' : ''}
+                      onClick={() => setBookingFilter('all')}
+                    >
+                      All Bookings ({allBookings.length})
+                    </button>
+                    <button
+                      className={bookingFilter === 'active' ? 'on' : ''}
+                      onClick={() => setBookingFilter('active')}
+                    >
+                      Active ({allBookings.filter((b) => b.status !== 'completed' && b.status !== 'cancelled').length})
+                    </button>
+                    <button
+                      className={bookingFilter === 'completed' ? 'on' : ''}
+                      onClick={() => setBookingFilter('completed')}
+                    >
+                      Completed ({allBookings.filter((b) => b.status === 'completed').length})
+                    </button>
                   </div>
 
-                  <div className="text-left md:text-right flex-none">
-                    <div className="text-lg font-bold text-[var(--ink)]">
-                      ₹{b.total_amount || 598}
+                  {filteredBookings.length === 0 ? (
+                    <div className="empty-state">
+                      <div className="ic">🍳</div>
+                      <h3>No bookings found</h3>
+                      <p style={{ marginTop: '8px' }}>
+                        Book your first cook in 10 minutes. Transparent hourly pricing and instant matching.
+                      </p>
+                      <Link href="/?book=true" className="btn btn-primary btn-small mt-4 inline-flex">
+                        Book a Cook Now
+                      </Link>
                     </div>
-                    <div className="text-xs text-[var(--text-faint)]">
-                      Hourly rate included
+                  ) : (
+                    <div>
+                      {filteredBookings.map((b) => (
+                        <div key={b.id} className="booking-row">
+                          <div className="left">
+                            <strong>
+                              {b.services?.name || 'Home Cook Service'} — {b.booking_number}
+                            </strong>
+                            <span>
+                              {b.booking_date} at {b.start_time} · {b.guest_count} people · {b.duration_hours} hrs
+                            </span>
+                            {b.cooking_notes && (
+                              <span style={{ display: 'block', marginTop: '2px', color: 'var(--text-faint)' }}>
+                                {b.cooking_notes}
+                              </span>
+                            )}
+                          </div>
+                          <div className="actions">
+                            <span
+                              className={`status-badge ${
+                                b.status === 'completed'
+                                  ? 'success'
+                                  : b.status === 'cancelled'
+                                  ? 'fail'
+                                  : 'pending'
+                              }`}
+                            >
+                              {b.status.toUpperCase()}
+                            </span>
+                            <span style={{ fontWeight: 700, fontSize: '15px', color: 'var(--ink)' }}>
+                              ₹{b.total_amount || 559}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SAVED ADDRESSES PANE */}
+              {activeTab === 'addresses' && (
+                <div>
+                  <div className="booking-row">
+                    <div className="left">
+                      <strong>Home</strong>
+                      <span>B-42, Sector 62, Noida, Uttar Pradesh</span>
+                    </div>
+                    <div className="actions">
+                      <button className="btn btn-ghost btn-small">Edit</button>
+                    </div>
+                  </div>
+                  <div className="booking-row">
+                    <div className="left">
+                      <strong>Office</strong>
+                      <span>Tower 3, Cyber Hub, Gurgaon, Haryana</span>
+                    </div>
+                    <div className="actions">
+                      <button className="btn btn-ghost btn-small">Edit</button>
+                    </div>
+                  </div>
+                  <button className="btn btn-ghost btn-small mt-2">+ Add new address</button>
+                </div>
+              )}
+
+              {/* PAYMENTS PANE */}
+              {activeTab === 'payments' && (
+                <div>
+                  <div className="booking-row">
+                    <div className="left">
+                      <strong>UPI — {data?.profile?.email ? data.profile.email.split('@')[0] + '@upi' : 'user@okhdfcbank'}</strong>
+                      <span>Default payment method</span>
+                    </div>
+                    <div className="actions">
+                      <span className="status-badge success">Verified</span>
+                    </div>
+                  </div>
+                  <button className="btn btn-ghost btn-small mt-2">+ Add payment method</button>
+                </div>
+              )}
+
+              {/* HELP & SUPPORT PANE */}
+              {activeTab === 'support' && (
+                <div>
+                  <div className="dash-cards">
+                    <div className="dash-card">
+                      <div className="lb">Live chat</div>
+                      <div className="num" style={{ fontSize: '16px' }}>Avg reply 2 min</div>
+                    </div>
+                    <div className="dash-card">
+                      <div className="lb">Call support</div>
+                      <div className="num" style={{ fontSize: '16px' }}>+91 95820 72540</div>
+                    </div>
+                    <div className="dash-card">
+                      <div className="lb">WhatsApp</div>
+                      <div className="num" style={{ fontSize: '16px' }}>Message us</div>
+                    </div>
+                  </div>
+                  <div className="booking-row">
+                    <div className="left">
+                      <strong>Refund request</strong>
+                      <span>Track an existing refund or billing dispute</span>
+                    </div>
+                    <div className="actions">
+                      <button className="btn btn-ghost btn-small">Check status</button>
+                    </div>
+                  </div>
+                  <div className="booking-row">
+                    <div className="left">
+                      <strong>Emergency contact</strong>
+                      <span>Urgent safety concern during a live cooking session</span>
+                    </div>
+                    <div className="actions">
+                      <a href="tel:+919582072540" className="btn btn-primary btn-small">
+                        Call now
+                      </a>
                     </div>
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* PROFILE PANE */}
+              {activeTab === 'profile' && (
+                <div className="review-card">
+                  <div className="review-row">
+                    <span className="k">Name</span>
+                    <span className="v">{data?.profile?.full_name || user?.fullName || 'Customer'}</span>
+                  </div>
+                  <div className="review-row">
+                    <span className="k">Email</span>
+                    <span className="v">{data?.profile?.email || user?.email}</span>
+                  </div>
+                  <div className="review-row">
+                    <span className="k">Phone</span>
+                    <span className="v">{data?.profile?.phone || 'Verified mobile on file'}</span>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </main>
+
+      <SiteFooter onOpenBooking={() => router.push('/?book=true')} />
     </div>
   );
 }
 
 export default function CustomerDashboardPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[var(--paper)]">Loading dashboard...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[var(--paper)]">
+          Loading dashboard...
+        </div>
+      }
+    >
       <CustomerDashboardContent />
     </Suspense>
   );

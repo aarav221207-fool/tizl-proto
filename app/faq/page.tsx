@@ -209,7 +209,7 @@ export default function FaqPage() {
         </section>
 
         {/* Categories Bar */}
-        <div className="border-y border-[var(--line)] bg-[var(--surface)] py-4 sticky top-[78px] z-20 backdrop-blur-md">
+        <div className="border-y border-[var(--line)] bg-[var(--surface)] py-3 sm:py-4 sticky top-[64px] md:top-[78px] z-20 backdrop-blur-md">
           <div className="wrap">
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none items-center">
               {CATEGORIES.map((c) => (

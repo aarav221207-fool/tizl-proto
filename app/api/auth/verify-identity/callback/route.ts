@@ -5,23 +5,43 @@ import { identityVerificationService } from '@/services/identity-verification.se
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) {
-      return NextResponse.redirect(`${req.nextUrl.origin}/partner/login`);
+      return NextResponse.redirect(new URL('/partner/login', req.nextUrl.origin));
     }
 
-    // In a real implementation, Digilocker sends POST with a payload, or GET with a query string.
-    // For this simulation, we'll extract query params.
+    if (!identityVerificationService.isConfigured()) {
+      const errUrl = new URL('/partner/verification', req.nextUrl.origin);
+      errUrl.searchParams.set(
+        'error',
+        'DigiLocker / Aadhaar provider is not configured on the server. Please contact system administrator.'
+      );
+      return NextResponse.redirect(errUrl);
+    }
+
     const searchParams = req.nextUrl.searchParams;
     const payload = Object.fromEntries(searchParams.entries());
-    const signature = 'simulated_signature';
+    const signature = req.headers.get('x-digilocker-signature') || searchParams.get('signature') || '';
+
+    if (!signature) {
+      const errUrl = new URL('/partner/verification', req.nextUrl.origin);
+      errUrl.searchParams.set(
+        'error',
+        'Missing authoritative cryptographic signature from identity provider.'
+      );
+      return NextResponse.redirect(errUrl);
+    }
 
     await identityVerificationService.processCallback(supabase, user.id, payload, signature);
-
-    return NextResponse.redirect(`${req.nextUrl.origin}/partner/verification`);
-  } catch (err) {
-    console.error('Callback error:', err);
-    return NextResponse.redirect(`${req.nextUrl.origin}/partner/verification?error=callback_failed`);
+    const successUrl = new URL('/partner/verification', req.nextUrl.origin);
+    successUrl.searchParams.set('status', 'under_review');
+    return NextResponse.redirect(successUrl);
+  } catch (err: any) {
+    console.error('Identity verification callback error:', err?.message || err);
+    const errUrl = new URL('/partner/verification', req.nextUrl.origin);
+    errUrl.searchParams.set('error', err?.message || 'Verification callback validation failed.');
+    return NextResponse.redirect(errUrl);
   }
 }

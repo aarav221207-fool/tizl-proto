@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { authenticateRequest } from '@/middleware/authentication';
 import { bookingService } from '@/services/booking.service';
 import { successResponse, errorResponse } from '@/lib/api-response';
-import { BadRequestError } from '@/lib/errors';
+import { BadRequestError, ForbiddenError } from '@/lib/errors';
 
 export async function GET(
   _req: NextRequest,
@@ -18,10 +18,10 @@ export async function GET(
 
     // Authorization check
     if (user.role === 'customer' && booking.customer_id !== user.id) {
-      throw new BadRequestError('Unauthorized to view this booking');
+      throw new ForbiddenError('Access denied: You are not authorized to view this booking.');
     }
     if (user.role === 'cook' && booking.cook_id !== user.id) {
-      throw new BadRequestError('Unauthorized to view this booking');
+      throw new ForbiddenError('Access denied: You are not authorized to view this booking.');
     }
 
     return successResponse({ booking });

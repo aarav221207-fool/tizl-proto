@@ -1,13 +1,16 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
+import { SiteHeader } from '@/components/SiteHeader';
+import { SiteFooter } from '@/components/SiteFooter';
 
-export default function PartnerDashboardPage() {
+function PartnerDashboardContent() {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'today' | 'earnings' | 'ratings' | 'training'>('today');
 
   useEffect(() => {
     if (!isLoading) {
@@ -20,94 +23,203 @@ export default function PartnerDashboardPage() {
   }, [isLoading, isAuthenticated, user, router]);
 
   if (isLoading || !isAuthenticated || user?.role !== 'cook') {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--paper)]">
+        <div className="text-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--blue)] mx-auto mb-4" />
+          <p className="text-sm font-medium text-[var(--text-dim)]">Loading partner portal...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <header className="site-header" style={{ position: 'relative', background: '#fff', borderBottom: '1px solid #eee' }}>
-        <div className="wrap flex items-center h-[70px]">
-          <Link href="/" className="logo text-[#0F1736] font-bold text-2xl flex items-center gap-1">
-            <span className="text-[#1D53DC]">Ti</span>Zl
-          </Link>
-          <span className="ml-4 pl-4 border-l border-gray-200 text-sm font-semibold text-gray-500 uppercase tracking-wider">
-            Partner Dashboard
-          </span>
-          <div className="ml-auto flex items-center gap-4">
-            <div className="text-sm font-medium text-gray-700">Hello, {user.fullName}</div>
-            <button onClick={() => logout()} className="text-sm font-medium text-[#1D53DC] hover:text-[#1340B0]">
-              Logout
-            </button>
+    <div className="min-h-screen bg-[var(--surface)] flex flex-col font-sans">
+      <SiteHeader />
+
+      <main className="dashboard open flex-1">
+        <div className="wrap">
+          <div className="dash-head">
+            <div>
+              <h1>Good morning, {user.fullName?.split(' ')[0] || 'Partner'}.</h1>
+              <p>You have 2 scheduled jobs today in Noida &amp; Delhi NCR.</p>
+            </div>
+            <div className="flex gap-2">
+              <span className="status-badge success">Online &amp; Available</span>
+            </div>
+          </div>
+
+          <div className="dash-grid">
+            {/* Sidebar navigation */}
+            <div className="dash-nav">
+              <button
+                className={activeTab === 'today' ? 'on' : ''}
+                onClick={() => setActiveTab('today')}
+              >
+                Today&apos;s Jobs
+              </button>
+              <button
+                className={activeTab === 'earnings' ? 'on' : ''}
+                onClick={() => setActiveTab('earnings')}
+              >
+                Earnings &amp; Wallet
+              </button>
+              <button
+                className={activeTab === 'ratings' ? 'on' : ''}
+                onClick={() => setActiveTab('ratings')}
+              >
+                Ratings
+              </button>
+              <button
+                className={activeTab === 'training' ? 'on' : ''}
+                onClick={() => setActiveTab('training')}
+              >
+                Training
+              </button>
+              <button onClick={() => logout()}>Logout</button>
+            </div>
+
+            {/* Content pane */}
+            <div>
+              {activeTab === 'today' && (
+                <div>
+                  <div className="dash-cards">
+                    <div className="dash-card featured">
+                      <div className="lb">Today&apos;s earnings</div>
+                      <div className="num">₹1,840</div>
+                      <div className="trend">↑ 12% from last week</div>
+                    </div>
+                    <div className="dash-card">
+                      <div className="lb">Jobs today</div>
+                      <div className="num">2</div>
+                    </div>
+                    <div className="dash-card">
+                      <div className="lb">Rating</div>
+                      <div className="num">4.9 ★</div>
+                    </div>
+                  </div>
+
+                  <div className="job-card">
+                    <div className="flex justify-between items-start flex-wrap gap-2">
+                      <div>
+                        <strong style={{ fontSize: '16px' }}>Dinner for 4 — Sector 62, Noida</strong>
+                        <div style={{ fontSize: '13px', color: 'var(--text-dim)', marginTop: '4px' }}>
+                          7:30 PM · 2 dishes + Rotis · North Indian Home Style
+                        </div>
+                      </div>
+                      <span className="status-badge pending">Assigned</span>
+                    </div>
+                    <div className="job-pipeline">
+                      <span className="done">Accepted</span>
+                      <span className="now">Start Cooking</span>
+                      <span>Completed</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t border-[var(--line)]">
+                      <span style={{ fontSize: '13px', color: 'var(--text-dim)' }}>OTP required at customer kitchen</span>
+                      <button className="btn btn-primary btn-small">Navigate to Address</button>
+                    </div>
+                  </div>
+
+                  <div className="job-card">
+                    <div className="flex justify-between items-start flex-wrap gap-2">
+                      <div>
+                        <strong style={{ fontSize: '16px' }}>Lunch Prep for 2 — Indirapuram</strong>
+                        <div style={{ fontSize: '13px', color: 'var(--text-dim)', marginTop: '4px' }}>
+                          1:00 PM · Dal Makhani, Paneer Bhurji &amp; Phulkas
+                        </div>
+                      </div>
+                      <span className="status-badge success">Completed</span>
+                    </div>
+                    <div className="job-pipeline">
+                      <span className="done">Accepted</span>
+                      <span className="done">Cooked</span>
+                      <span className="done">Paid ₹920</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'earnings' && (
+                <div>
+                  <div className="dash-cards">
+                    <div className="dash-card">
+                      <div className="lb">Wallet balance</div>
+                      <div className="num">₹6,420</div>
+                    </div>
+                    <div className="dash-card">
+                      <div className="lb">This week</div>
+                      <div className="num">₹9,150</div>
+                    </div>
+                    <div className="dash-card">
+                      <div className="lb">This month</div>
+                      <div className="num">₹31,600</div>
+                    </div>
+                  </div>
+                  <button className="btn btn-primary btn-small">Withdraw to Bank (Instant UPI)</button>
+                </div>
+              )}
+
+              {activeTab === 'ratings' && (
+                <div>
+                  <div className="booking-row">
+                    <div className="left">
+                      <strong>Priya S.</strong>
+                      <span>&ldquo;Punctual and the food was excellent. Very hygienic!&rdquo;</span>
+                    </div>
+                    <div className="actions text-amber-500 font-bold">★★★★★</div>
+                  </div>
+                  <div className="booking-row">
+                    <div className="left">
+                      <strong>Rohit K.</strong>
+                      <span>&ldquo;Great with kids&apos; meals, left the kitchen spotless.&rdquo;</span>
+                    </div>
+                    <div className="actions text-amber-500 font-bold">★★★★★</div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'training' && (
+                <div>
+                  <div className="booking-row">
+                    <div className="left">
+                      <strong>Hygiene &amp; food safety standards</strong>
+                      <span>12 min video · Certification active</span>
+                    </div>
+                    <div className="actions">
+                      <button className="btn btn-ghost btn-small">Watch</button>
+                    </div>
+                  </div>
+                  <div className="booking-row">
+                    <div className="left">
+                      <strong>Customer communication &amp; kitchen etiquette</strong>
+                      <span>8 min video</span>
+                    </div>
+                    <div className="actions">
+                      <button className="btn btn-ghost btn-small">Watch</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </header>
-
-      <main className="flex-1 py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-yellow-700">
-                Your account is currently pending verification. You cannot receive booking requests until your identity is verified.
-              </p>
-              <p className="mt-2">
-                <Link href="/partner/verification" className="text-sm font-medium text-yellow-700 underline hover:text-yellow-600">
-                  Complete Verification
-                </Link>
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="bg-white overflow-hidden shadow rounded-lg border border-gray-100">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-[#1D53DC]/10 rounded-md p-3">
-                  <svg className="h-6 w-6 text-[#1D53DC]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Upcoming Bookings</dt>
-                    <dd className="text-lg font-medium text-gray-900">0</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3 border-t border-gray-100">
-              <div className="text-sm text-gray-500">Available after verification</div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg border border-gray-100">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-green-100 rounded-md p-3">
-                  <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Earnings</dt>
-                    <dd className="text-lg font-medium text-gray-900">₹0</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-5 py-3 border-t border-gray-100">
-              <div className="text-sm text-gray-500">Available after verification</div>
-            </div>
-          </div>
-        </div>
-
       </main>
+
+      <SiteFooter />
     </div>
+  );
+}
+
+export default function PartnerDashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[var(--paper)]">
+          Loading partner dashboard...
+        </div>
+      }
+    >
+      <PartnerDashboardContent />
+    </Suspense>
   );
 }

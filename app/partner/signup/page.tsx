@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { createClient } from '@/lib/supabase/client';
+import { TizlLogo } from '@/components/TizlLogo';
 
 const CUISINES = ['North Indian', 'South Indian', 'Chinese', 'Continental', 'Punjabi', 'Gujarati', 'Jain', 'Healthy Meals', 'Baby Food'];
 const AVAIL_SLOTS = ['Morning', 'Afternoon', 'Evening', 'Night'];
@@ -111,15 +112,17 @@ function PartnerSignupContent() {
   return (
     <div className="min-h-screen flex flex-col bg-[var(--paper)]">
       <header className="site-header" style={{ position: 'relative', background: '#fff', borderBottom: '1px solid var(--line)' }}>
-        <div className="wrap flex items-center h-[78px]">
-          <Link href="/" className="logo text-[#0F1736] font-bold text-2xl flex items-center gap-1">
-            <span className="text-[#2E46E0]">Ti</span>zl
-          </Link>
-          <span className="ml-4 pl-4 border-l border-gray-200 text-sm font-semibold text-gray-500 uppercase tracking-wider">
-            Become a Partner Cook
-          </span>
-          <div className="ml-auto">
-            <Link href="/partner/login" className="text-sm font-medium text-gray-500 hover:text-gray-900">
+        <div className="wrap flex items-center justify-between h-[64px] sm:h-[78px]">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Link href="/" className="logo" aria-label="Tizl Home">
+              <TizlLogo height={32} />
+            </Link>
+            <span className="hidden sm:inline-block pl-3 border-l border-gray-200 text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider">
+              Become a Partner Cook
+            </span>
+          </div>
+          <div>
+            <Link href="/partner/login" className="text-xs sm:text-sm font-medium text-gray-500 hover:text-gray-900">
               Already a partner? Sign in
             </Link>
           </div>

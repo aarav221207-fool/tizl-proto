@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
+import { TizlLogo } from '@/components/TizlLogo';
 
 export default function PartnerVerificationPage() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -48,15 +49,17 @@ export default function PartnerVerificationPage() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <header className="site-header" style={{ position: 'relative', background: '#fff', borderBottom: '1px solid #eee' }}>
-        <div className="wrap flex items-center h-[70px]">
-          <Link href="/" className="logo text-[#0F1736] font-bold text-2xl flex items-center gap-1">
-            <span className="text-[#1D53DC]">Ti</span>Zl
-          </Link>
-          <span className="ml-4 pl-4 border-l border-gray-200 text-sm font-semibold text-gray-500 uppercase tracking-wider">
-            Partner Verification
-          </span>
-          <div className="ml-auto">
-            <Link href="/partner/dashboard" className="text-sm font-medium text-gray-500 hover:text-gray-900">
+        <div className="wrap flex items-center justify-between h-[64px] sm:h-[70px]">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Link href="/" className="logo" aria-label="Tizl Home">
+              <TizlLogo height={32} />
+            </Link>
+            <span className="hidden sm:inline-block pl-3 border-l border-gray-200 text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider">
+              Partner Verification
+            </span>
+          </div>
+          <div>
+            <Link href="/partner/dashboard" className="text-xs sm:text-sm font-medium text-gray-500 hover:text-gray-900">
               Go to Dashboard
             </Link>
           </div>

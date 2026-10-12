@@ -1,83 +1,101 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { env } from '@/lib/env';
+import crypto from 'crypto';
 
-/**
- * Interface representing the required methods for any authorized Identity Verification Provider.
- * This ensures that whether we use DigiLocker, Aadhaar API, or another KYC vendor in the future,
- * the architecture remains decoupled.
- */
-export interface IdentityProvider {
-  /**
-   * Generates the URL/parameters required to redirect the partner to the provider's secure verification portal.
-   */
-  startVerification(userId: string, redirectUrl: string): Promise<{ verificationUrl: string; providerReference: string }>;
-  
-  /**
-   * Handles the secure callback/webhook from the provider after the user completes the flow.
-   * Validates the payload and extracts identity information.
-   */
-  handleCallback(payload: any, signature: string): Promise<VerificationResult>;
-}
-
-export type VerificationResult = {
+export interface VerificationResult {
   status: 'verified' | 'rejected' | 'pending';
   providerReference: string;
   verifiedAt?: string;
   rejectionReason?: string;
-};
+}
 
-class PlaceholderIdentityProvider implements IdentityProvider {
+export interface IdentityProvider {
+  isConfigured(): boolean;
+  startVerification(userId: string, redirectUrl: string): Promise<{ verificationUrl: string; providerReference: string }>;
+  handleCallback(payload: Record<string, string>, signature: string): Promise<VerificationResult>;
+}
+
+export class DigiLockerIdentityProvider implements IdentityProvider {
+  private get clientId(): string {
+    return process.env.DIGILOCKER_CLIENT_ID || '';
+  }
+
+  private get clientSecret(): string {
+    return process.env.DIGILOCKER_CLIENT_SECRET || '';
+  }
+
+  isConfigured(): boolean {
+    return Boolean(
+      this.clientId &&
+      !this.clientId.includes('placeholder') &&
+      this.clientSecret &&
+      !this.clientSecret.includes('placeholder')
+    );
+  }
+
   async startVerification(userId: string, redirectUrl: string) {
-    // In a real implementation, this would call the Digilocker/Aadhaar API
-    // to generate a secure session token and redirect URL.
-    
-    if (!env.NEXT_PUBLIC_SUPABASE_URL) {
-       throw new Error('PROVIDER CONFIGURATION REQUIRED: Missing external API credentials.');
+    if (!this.isConfigured()) {
+      throw new Error(
+        'DIGILOCKER_NOT_CONFIGURED: DIGILOCKER_CLIENT_ID and DIGILOCKER_CLIENT_SECRET are required server environment variables for authenticating partner identity verification.'
+      );
     }
-    
-    // For now, simulate a redirect back with a placeholder reference
-    const dummyRef = `req_${Date.now()}`;
-    const cbUrl = new URL(redirectUrl);
-    cbUrl.searchParams.set('ref', dummyRef);
-    cbUrl.searchParams.set('status', 'simulated_success'); // Only for dev, real provider uses secure callbacks
-    
+
+    const stateToken = crypto.randomBytes(24).toString('hex');
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: this.clientId,
+      redirect_uri: redirectUrl,
+      state: userId + ':' + stateToken,
+      scope: 'org.digitallocker.aadhaar',
+    });
+
     return {
-      verificationUrl: cbUrl.toString(),
-      providerReference: dummyRef,
+      verificationUrl: 'https://digilocker.gov.in/public/oauth2/1/authorize?' + params.toString(),
+      providerReference: stateToken,
     };
   }
 
-  async handleCallback(payload: any, signature: string): Promise<VerificationResult> {
-    // In production, verify the cryptographic signature from the provider.
-    if (!payload.ref) {
-      throw new Error('Invalid provider payload');
+  async handleCallback(payload: Record<string, string>, signature: string): Promise<VerificationResult> {
+    if (!this.isConfigured()) {
+      throw new Error('DIGILOCKER_NOT_CONFIGURED: External credentials required.');
     }
 
-    if (payload.status === 'simulated_success') {
+    if (!payload.code) {
       return {
-        status: 'verified',
-        providerReference: payload.ref,
-        verifiedAt: new Date().toISOString(),
+        status: 'rejected',
+        providerReference: payload.state || '',
+        rejectionReason: payload.error_description || 'Authorization code was not provided by identity gateway',
       };
     }
 
+    if (!signature || signature === 'simulated_signature') {
+      throw new Error('INVALID_SIGNATURE: Provider callback must contain a valid cryptographic HMAC signature.');
+    }
+
+    const expectedSignature = crypto
+      .createHmac('sha256', this.clientSecret)
+      .update(payload.code + (payload.state || ''))
+      .digest('hex');
+
+    if (!crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expectedSignature, 'hex'))) {
+      throw new Error('SIGNATURE_VERIFICATION_FAILED: Callback signature does not match provider secret.');
+    }
+
     return {
-      status: 'rejected',
-      providerReference: payload.ref,
-      rejectionReason: 'Verification failed or was cancelled',
+      status: 'pending',
+      providerReference: payload.state || '',
+      verifiedAt: new Date().toISOString(),
     };
   }
 }
 
 export const identityVerificationService = {
-  // Configured provider
-  provider: new PlaceholderIdentityProvider() as IdentityProvider,
+  provider: new DigiLockerIdentityProvider(),
 
-  /**
-   * Initiates the verification process for a partner
-   */
+  isConfigured(): boolean {
+    return this.provider.isConfigured();
+  },
+
   async initializeVerification(supabase: SupabaseClient, userId: string, redirectUrl: string) {
-    // 1. Check if user is a cook
     const { data: profile } = await supabase
       .from('profiles')
       .select('role, status')
@@ -85,29 +103,32 @@ export const identityVerificationService = {
       .single();
 
     if (profile?.role !== 'cook') {
-      throw new Error('Only partners can undergo this verification.');
+      throw new Error('Only registered partner cooks can undergo identity verification.');
     }
 
-    // 2. Start provider flow
+    if (!this.provider.isConfigured()) {
+      throw new Error(
+        'DigiLocker / Aadhaar identity verification is not configured in server environment variables (DIGILOCKER_CLIENT_ID, DIGILOCKER_CLIENT_SECRET).'
+      );
+    }
+
     const { verificationUrl, providerReference } = await this.provider.startVerification(userId, redirectUrl);
 
-    // 3. Store reference securely in DB (e.g., in cook_details or a verification_sessions table)
-    // For now we will update profile status to 'verification_started'
     await supabase
       .from('profiles')
-      .update({ status: 'verification_started' })
+      .update({ status: 'verification_started', updated_at: new Date().toISOString() })
       .eq('id', userId);
 
-    return { verificationUrl };
+    return { verificationUrl, providerReference };
   },
 
-  /**
-   * Process the return payload from the provider
-   */
-  async processCallback(supabase: SupabaseClient, userId: string, payload: any, signature: string) {
+  async processCallback(supabase: SupabaseClient, userId: string, payload: Record<string, string>, signature: string) {
+    if (!this.provider.isConfigured()) {
+      throw new Error('Identity verification provider credentials are not configured.');
+    }
+
     const result = await this.provider.handleCallback(payload, signature);
 
-    // Update the profile based on the provider's authoritative result
     if (result.status === 'verified') {
       await supabase
         .from('profiles')
@@ -118,14 +139,16 @@ export const identityVerificationService = {
         .from('profiles')
         .update({ status: 'rejected', updated_at: new Date().toISOString() })
         .eq('id', userId);
+    } else if (result.status === 'pending') {
+      await supabase
+        .from('profiles')
+        .update({ status: 'under_review', updated_at: new Date().toISOString() })
+        .eq('id', userId);
     }
 
     return result;
   },
 
-  /**
-   * Safely get the verification status of a cook without exposing credentials.
-   */
   async getVerificationStatus(supabase: SupabaseClient, userId: string) {
     const { data: profile, error } = await supabase
       .from('profiles')
@@ -135,5 +158,5 @@ export const identityVerificationService = {
 
     if (error || !profile) return null;
     return profile.status;
-  }
+  },
 };

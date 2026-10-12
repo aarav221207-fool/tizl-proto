@@ -185,7 +185,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const isAdmin = profile?.role === 'admin' || user.user_metadata?.role === 'admin' || !!adminRecord;
+    // Strictly check trusted server-controlled database authorization.
+    // Never trust user-editable metadata (e.g. user_metadata.role or user_metadata.is_admin).
+    const isAdmin = !!adminRecord || (profile && profile.role === 'admin');
 
     if (!isAdmin) {
       console.log('[Admin Login] admin authorization failed');

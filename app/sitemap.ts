@@ -3,27 +3,23 @@ import { createClient } from '@supabase/supabase-js';
 
 const FALLBACK_CITIES = [
   'delhi',
-  'mumbai',
-  'bengaluru',
-  'hyderabad',
-  'pune',
-  'chennai',
-  'ahmedabad',
-  'kolkata',
+  'noida',
+  'gurgaon',
 ];
 
 const FALLBACK_SERVICES = [
-  'daily-home-cooking',
-  'breakfast-service',
-  'dinner-service',
-  'weekly-meal-prep',
+  'breakfast',
+  'lunch',
+  'dinner',
   'party-cooking',
-  'festival-cooking',
+  'meal-prep',
+  'weekly-cook',
+  'baby-food',
+  'senior-meals',
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://www.tizl.in';
-
+  const baseUrl = 'https://tizl.in';
   const lastModified = new Date();
 
   const routes: MetadataRoute.Sitemap = [
@@ -34,31 +30,31 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 1.0,
     },
     {
-      url: `${baseUrl}/how-it-works`,
+      url: baseUrl + '/how-it-works',
       lastModified,
       changeFrequency: 'weekly',
       priority: 0.9,
     },
     {
-      url: `${baseUrl}/about`,
+      url: baseUrl + '/about',
       lastModified,
       changeFrequency: 'monthly',
       priority: 0.8,
     },
     {
-      url: `${baseUrl}/faq`,
+      url: baseUrl + '/faq',
       lastModified,
       changeFrequency: 'weekly',
       priority: 0.8,
     },
     {
-      url: `${baseUrl}/contact`,
+      url: baseUrl + '/contact',
       lastModified,
       changeFrequency: 'monthly',
       priority: 0.8,
     },
     {
-      url: `${baseUrl}/partner/signup`,
+      url: baseUrl + '/partner/signup',
       lastModified,
       changeFrequency: 'monthly',
       priority: 0.7,
@@ -71,11 +67,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let citySlugs = new Set<string>(FALLBACK_CITIES);
   let serviceSlugs = new Set<string>(FALLBACK_SERVICES);
 
-  if (supabaseUrl && supabaseKey) {
+  if (supabaseUrl && supabaseKey && !supabaseUrl.includes('placeholder')) {
     try {
       const supabase = createClient(supabaseUrl, supabaseKey);
 
-      // Fetch active cities from DB
       const { data: dbCities } = await supabase
         .from('cities')
         .select('name')
@@ -87,7 +82,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         );
       }
 
-      // Fetch active services from DB
       const { data: dbServices } = await supabase
         .from('services')
         .select('service_name, name')
@@ -106,20 +100,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   }
 
-  // Append city routes
   citySlugs.forEach((slug) => {
     routes.push({
-      url: `${baseUrl}/cooks/${slug}`,
+      url: baseUrl + '/cooks/' + slug,
       lastModified,
       changeFrequency: 'weekly',
       priority: 0.8,
     });
   });
 
-  // Append service routes
   serviceSlugs.forEach((slug) => {
     routes.push({
-      url: `${baseUrl}/services/${slug}`,
+      url: baseUrl + '/services/' + slug,
       lastModified,
       changeFrequency: 'weekly',
       priority: 0.8,

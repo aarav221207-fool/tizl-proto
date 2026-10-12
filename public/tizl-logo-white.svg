@@ -1,0 +1,26 @@
+<svg viewBox="70 20 495 390" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Flame / Steam Plumes -->
+  <path d="M265 35 C235 60 270 95 240 125 C255 125 285 90 270 65 C265 55 285 45 265 35 Z" fill="#FF7A00" />
+  <path d="M310 55 C275 85 320 120 285 155 C305 155 345 110 325 80 C320 70 340 60 310 55 Z" fill="#FF9E00" />
+
+  <!-- Skillet Pan & Handle (Letter 'T') -->
+  <g fill="#FF4605">
+    <path d="M100 155 C90 155 80 162 80 172 C80 185 88 195 105 200 L170 215 C160 250 145 305 130 350 C125 365 135 385 155 388 C175 390 190 380 200 360 C215 315 230 260 240 215 L295 210 C340 205 380 195 410 180 C418 175 415 160 405 160 L380 160 C370 148 350 140 325 142 L130 148 C115 148 105 152 100 155 Z" />
+    <path d="M330 175 L385 165 C398 162 408 170 405 182 C402 192 390 196 378 196 L335 190 Z" />
+  </g>
+
+  <!-- Skillet lid knob -->
+  <ellipse cx="205" cy="140" rx="20" ry="12" fill="#FFFFFF" />
+  <!-- Handle hole -->
+  <ellipse cx="388" cy="176" rx="5" ry="3.5" fill="#0D1229" />
+
+  <!-- Letter 'i' (white for dark background) -->
+  <circle cx="280" cy="245" r="26" fill="#FFFFFF" />
+  <rect x="254" y="290" width="52" height="110" rx="26" fill="#FFFFFF" />
+
+  <!-- Letter 'z' (white for dark background) -->
+  <path d="M335 300 C335 292 342 285 352 285 L445 285 C456 285 462 295 456 304 L375 375 L450 375 C460 375 468 382 468 390 C468 398 460 405 450 405 L350 405 C338 405 332 395 338 386 L418 315 L352 315 C342 315 335 308 335 300 Z" fill="#FFFFFF" />
+
+  <!-- Letter 'l' (white for dark background) -->
+  <rect x="495" y="165" width="58" height="235" rx="29" fill="#FFFFFF" />
+</svg>

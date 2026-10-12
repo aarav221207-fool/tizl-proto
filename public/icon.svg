@@ -1,0 +1,18 @@
+<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="112" fill="#0D1229" />
+  
+  <!-- Steam plumes -->
+  <g transform="translate(25, 10)">
+    <path d="M220 50 C185 85 225 130 190 170 C210 170 248 125 228 90 C222 76 248 62 220 50 Z" fill="#FF7A00" />
+    <path d="M275 75 C235 115 285 160 245 205 C270 205 320 150 295 110 C288 98 312 85 275 75 Z" fill="#FF9E00" />
+  </g>
+
+  <!-- Skillet 'T' -->
+  <g transform="translate(25, 10)" fill="#FF4605">
+    <path d="M60 200 C48 200 36 210 36 224 C36 240 46 254 68 260 L145 280 C132 324 114 394 95 450 C88 470 102 494 126 498 C150 502 168 490 180 464 C198 408 216 338 230 280 L298 274 C352 268 402 254 440 236 C450 230 446 210 434 210 L402 210 C390 194 366 184 336 186 L100 192 C80 192 68 196 60 200 Z" />
+  </g>
+  
+  <!-- Pan details -->
+  <ellipse cx="255" cy="195" rx="24" ry="14" fill="#FFFFFF" opacity="0.9" />
+  <ellipse cx="442" cy="231" rx="6" ry="4" fill="#0D1229" />
+</svg>

@@ -94,10 +94,12 @@ export async function authenticateAdminRequest(): Promise<AuthenticatedAdminUser
     adminRecord = aRes.data;
   }
 
-  const isProfileAdmin =
-    profile?.role === 'admin' || user.user_metadata?.role === 'admin' || !!adminRecord;
+  // Strictly check trusted server-controlled database authorization.
+  // Never trust user-editable metadata (e.g. user_metadata.role or user_metadata.is_admin).
+  // The user MUST exist in public.admin_users OR have public.profiles.role === 'admin'
+  const isAuthorizedAdmin = !!adminRecord || (profile && profile.role === 'admin');
 
-  if (!isProfileAdmin && !adminRecord) {
+  if (!isAuthorizedAdmin) {
     throw new ForbiddenError('This account does not have administrator access.');
   }
 
@@ -131,7 +133,7 @@ export async function authenticateAdminRequest(): Promise<AuthenticatedAdminUser
     email: profile?.email || user.email || null,
     phone: profile?.phone || user.phone || null,
     role: 'admin',
-    fullName: profile?.full_name || user.user_metadata?.full_name || null,
+    fullName: profile?.full_name || null,
     adminId: adminRecord?.id || null,
     designation,
     permissions,

@@ -2,208 +2,327 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from '@/context/auth-context';
 
-export const LOGO_SVG = (
-  <svg height="34" viewBox="0 0 320 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="logo-img" style={{ display: 'block', height: '34px', width: 'auto' }}>
-    {/* Three Steam Waves */}
-    <path d="M78 44 C82 37 77 31 80 23 C83 15 78 9 82 2" stroke="#1D53DC" strokeWidth="4.5" strokeLinecap="round" fill="none" />
-    <path d="M89 44 C93 37 88 31 91 23 C94 15 89 9 93 2" stroke="#1D53DC" strokeWidth="4.5" strokeLinecap="round" fill="none" />
-    <path d="M100 44 C104 37 99 31 102 23 C105 15 100 9 104 2" stroke="#1D53DC" strokeWidth="4.5" strokeLinecap="round" fill="none" />
-
-    {/* Pan Handle & Body */}
-    <g fill="#0F1736">
-      <path d="M37 50.5 C37 47.5 34.5 45 31.5 45 C28.5 45 26 47.5 26 50.5 C26 53.5 28.5 56 31.5 56 C34.5 56 37 53.5 37 50.5 Z M31.5 48.5 C32.6 48.5 33.5 49.4 33.5 50.5 C33.5 51.6 32.6 52.5 31.5 52.5 C30.4 52.5 29.5 51.6 29.5 50.5 C29.5 49.4 30.4 48.5 31.5 48.5 Z" />
-      <path d="M36 52 L57 52 C61 52 64 54 68 56 L73 57.5 C77 58 80 58.5 85 58.5 L120 58.5 C124 58.5 126 55 126 52 L73 52 C68 52 65 50 61 48 L56 46.5 C52 45.5 48 48 42 49 L36 49 Z" />
-      <path d="M58 52 C58 52 63 60 70 60.5 L116 60.5 C122 60.5 127 52 127 52 Z" />
-    </g>
-
-    {/* Typography 'TiZl' */}
-    <path d="M84 55 L100 55 L100 66 L94 66 L94 100 L84 100 L84 66 L78 66 L78 55 Z" fill="#0F1736" />
-    <circle cx="139" cy="50" r="6" fill="#1D53DC" />
-    <rect x="133" y="62" width="12" height="38" rx="6" fill="#1D53DC" />
-    <path d="M156 62 L188 62 C192 62 194 64.5 192 68 L168 90 L190 90 C193 90 195 92 195 95 L195 96 C195 98 193 100 190 100 L158 100 C154 100 152 97.5 154 94 L178 72 L158 72 C155 72 153 70 153 67 L153 66 C153 64 155 62 158 62 Z" fill="#1D53DC" />
-    <path d="M208 48 C211 48 213 50 213 53 L213 90 C213 96 217 99 223 99 L238 99 C241 99 243 101 243 104 C243 107 241 109 238 109 L221 109 C211 109 203 102 203 91 L203 53 C203 50 205 48 208 48 Z" fill="#0F1736" />
-  </svg>
-);
-
-const SERVICES_MENU = [
-  { slug: 'daily-home-cooking', label: 'Daily Home Cooking' },
-  { slug: 'breakfast-service', label: 'Breakfast Service' },
-  { slug: 'dinner-service', label: 'Dinner Service' },
-  { slug: 'weekly-meal-prep', label: 'Weekly Meal Prep' },
-  { slug: 'party-cooking', label: 'Party Cooking' },
-  { slug: 'festival-cooking', label: 'Festival Cooking' },
-];
-
-const CITIES_MENU = [
-  { slug: 'delhi', label: 'Delhi NCR' },
-  { slug: 'mumbai', label: 'Mumbai' },
-  { slug: 'bengaluru', label: 'Bengaluru' },
-  { slug: 'hyderabad', label: 'Hyderabad' },
-  { slug: 'pune', label: 'Pune' },
-  { slug: 'chennai', label: 'Chennai' },
-];
-
 interface SiteHeaderProps {
-  onOpenBooking?: (needId?: string) => void;
+  onOpenBooking?: () => void;
+  onOpenAuth?: (role?: 'customer' | 'partner') => void;
+  onOpenPartner?: () => void;
 }
 
-export function SiteHeader({ onOpenBooking }: SiteHeaderProps) {
+export function SiteHeader({ onOpenBooking, onOpenAuth, onOpenPartner }: SiteHeaderProps) {
   const { user, isAuthenticated, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handleBooking = () => {
+    if (onOpenBooking) {
+      onOpenBooking();
+    } else {
+      window.location.href = '/book';
+    }
+  };
+
+  const handleLogin = () => {
+    if (onOpenAuth) {
+      onOpenAuth();
+    } else {
+      window.location.href = '/customer/login';
+    }
+  };
 
   return (
     <header className="site-header">
       <div className="wrap">
-        <Link href="/" className="logo" aria-label="Tizl Home">
-          {LOGO_SVG}
+        <Link
+          href="/"
+          className="logo"
+          aria-label="Tizl Home"
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          }}
+        >
+          {/* Exact Tizl reference logo */}
+          <img
+            src="/assets/tizl-header-logo.png"
+            alt="Tizl"
+            style={{ height: '56px', width: 'auto', display: 'block' }}
+            className="h-10 sm:h-12 md:h-14"
+          />
         </Link>
 
-        {/* Desktop Navigation - Exact Tizl Nav */}
-        <nav className="main-nav">
-          <div className="nav-item">
-            <Link href="/#why-us">Why us</Link>
+        {/* Desktop Navigation */}
+        <nav className="main-nav" aria-label="Main Navigation">
+          <div className="nav-item active">
+            <Link href="/">Home</Link>
           </div>
-
-          {/* Services Dropdown */}
           <div className="nav-item">
-            <button type="button">Services <span className="caret">▾</span></button>
-            <div className="mega" style={{ minWidth: '240px' }}>
-              {SERVICES_MENU.map((s) => (
-                <Link key={s.slug} href={`/services/${s.slug}`}>
-                  {s.label}
-                </Link>
-              ))}
-              <Link className="view-all" href="/#services">View all services →</Link>
-            </div>
+            <a
+              href="#how-it-works"
+              onClick={(e) => {
+                if (window.location.pathname === '/') {
+                  e.preventDefault();
+                  document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
+            >
+              How it works
+            </a>
           </div>
-
-          {/* Cities Dropdown */}
           <div className="nav-item">
-            <button type="button">Cities <span className="caret">▾</span></button>
-            <div className="mega" style={{ minWidth: '220px' }}>
-              {CITIES_MENU.map((c) => (
-                <Link key={c.slug} href={`/cooks/${c.slug}`}>
-                  {c.label}
-                </Link>
-              ))}
-              <Link className="view-all" href="/#cities">View all cities →</Link>
-            </div>
+            <a
+              href="#services"
+              onClick={(e) => {
+                if (window.location.pathname === '/') {
+                  e.preventDefault();
+                  document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
+            >
+              Services
+            </a>
           </div>
-
           <div className="nav-item">
-            <Link href="/how-it-works">How it works</Link>
+            <a
+              href="#partners"
+              onClick={(e) => {
+                if (onOpenPartner) {
+                  e.preventDefault();
+                  onOpenPartner();
+                } else if (window.location.pathname === '/') {
+                  e.preventDefault();
+                  document.getElementById('partners')?.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
+            >
+              For Cooks
+            </a>
           </div>
-
           <div className="nav-item">
-            <Link href="/faq">FAQs</Link>
+            <a
+              href="#why-us"
+              onClick={(e) => {
+                if (window.location.pathname === '/') {
+                  e.preventDefault();
+                  document.getElementById('why-us')?.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
+            >
+              About
+            </a>
+          </div>
+          <div className="nav-item">
+            <a
+              href="#faqs"
+              onClick={(e) => {
+                if (window.location.pathname === '/') {
+                  e.preventDefault();
+                  document.getElementById('faqs')?.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
+            >
+              FAQs
+            </a>
           </div>
         </nav>
 
         {/* Header CTAs */}
-        <div className="header-ctas">
+        <div className="header-ctas" id="headerCtas">
+          <div className="loc-picker">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 21s7-6.6 7-11.2A7 7 0 105 9.8C5 14.4 12 21 12 21z" />
+              <circle cx="12" cy="9.6" r="2.3" />
+            </svg>
+            Delhi NCR <span style={{ fontSize: '10px' }}>▾</span>
+          </div>
+
           {!isAuthenticated && (
             <>
-              <Link href="/customer/login" className="btn btn-ghost btn-small font-semibold">Login</Link>
-              <Link href="/customer/signup" className="btn btn-ghost btn-small font-semibold hidden sm:inline-flex">Sign Up</Link>
+              <button
+                type="button"
+                className="btn btn-ghost btn-small"
+                onClick={handleLogin}
+              >
+                Login
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-small"
+                onClick={handleBooking}
+              >
+                Book a Cook <span className="arrow">→</span>
+              </button>
             </>
           )}
 
           {isAuthenticated && user?.role === 'customer' && (
             <>
-              <div className="header-user">
+              <Link href="/customer/dashboard" className="header-user">
                 <div className="av">{(user.fullName || user.email || 'U').charAt(0).toUpperCase()}</div>
-                <span className="hidden md:inline font-medium text-[var(--ink)]">
-                  Hello, {user.fullName?.split(' ')[0] || user.email?.split('@')[0]}
+                <span className="hidden sm:inline font-semibold text-[var(--ink)] text-sm">
+                  {user.fullName?.split(' ')[0] || user.email?.split('@')[0]}
                 </span>
-              </div>
-              <Link href="/customer/dashboard" className="btn btn-ghost btn-small font-semibold hidden sm:inline-flex">My Bookings</Link>
-              <button onClick={() => logout()} className="btn btn-ghost btn-small font-semibold">Logout</button>
+              </Link>
+              <button
+                type="button"
+                className="btn btn-primary btn-small"
+                onClick={handleBooking}
+              >
+                Book a Cook <span className="arrow">→</span>
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-small text-xs px-2.5 py-1.5"
+                onClick={() => logout()}
+              >
+                Logout
+              </button>
             </>
           )}
 
           {isAuthenticated && user?.role === 'cook' && (
             <>
-              <Link href="/partner/dashboard" className="btn btn-ghost btn-small font-semibold">Partner Dashboard</Link>
-              <Link href="/partner/verification" className="btn btn-ghost btn-small font-semibold hidden sm:inline-flex">Verification Status</Link>
-              <button onClick={() => logout()} className="btn btn-ghost btn-small font-semibold">Logout</button>
+              <Link href="/partner/dashboard" className="header-user">
+                <div className="av">{(user.fullName || 'P').charAt(0).toUpperCase()}</div>
+                <span className="hidden sm:inline font-semibold text-[var(--ink)] text-sm">
+                  {user.fullName?.split(' ')[0] || 'Partner'}
+                </span>
+              </Link>
+              <button
+                type="button"
+                className="btn btn-ghost btn-small text-xs px-2.5 py-1.5"
+                onClick={() => logout()}
+              >
+                Logout
+              </button>
             </>
           )}
 
-          {(!isAuthenticated || user?.role === 'customer') && (
-            onOpenBooking ? (
-              <button type="button" className="btn btn-primary btn-small" onClick={() => onOpenBooking()}>Book a cook</button>
-            ) : (
-              <Link href="/book" className="btn btn-primary btn-small">Book a cook</Link>
-            )
-          )}
-
-          {/* Mobile hamburger toggle (only visible on mobile) */}
+          {/* Mobile hamburger toggle */}
           <button
             type="button"
-            className="md:hidden flex flex-col justify-center items-center w-8 h-8 rounded border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] p-1 ml-1"
+            className="md:hidden flex flex-col justify-center items-center w-9 h-9 rounded-lg border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] p-1.5 ml-1 transition-colors hover:bg-white"
             aria-label="Toggle menu"
+            aria-expanded={mobileMenuOpen}
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
-            <span className="w-4 h-0.5 bg-[var(--ink)] my-0.5"></span>
-            <span className="w-4 h-0.5 bg-[var(--ink)] my-0.5"></span>
-            <span className="w-4 h-0.5 bg-[var(--ink)] my-0.5"></span>
+            <span className={`w-4 h-0.5 bg-[var(--ink)] transition-transform duration-200 ${mobileMenuOpen ? 'rotate-45 translate-y-1' : 'my-0.5'}`} />
+            <span className={`w-4 h-0.5 bg-[var(--ink)] transition-opacity duration-200 ${mobileMenuOpen ? 'opacity-0' : 'my-0.5'}`} />
+            <span className={`w-4 h-0.5 bg-[var(--ink)] transition-transform duration-200 ${mobileMenuOpen ? '-rotate-45 -translate-y-1' : 'my-0.5'}`} />
           </button>
         </div>
       </div>
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-[var(--line)] bg-[#ffffff] px-6 py-4 shadow-lg animate-in slide-in-from-top-2 duration-150">
+        <div className="md:hidden border-t border-[var(--line)] bg-[#ffffff] px-5 py-4 shadow-xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-top-2 duration-150">
           <div className="flex flex-col gap-2 font-medium text-sm">
-            <Link href="/#why-us" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b border-[var(--line)]">
-              Why us
+            <Link
+              href="/"
+              onClick={() => setMobileMenuOpen(false)}
+              className="py-2.5 border-b border-[var(--line)] hover:text-[var(--blue)]"
+            >
+              Home
             </Link>
-            <Link href="/how-it-works" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b border-[var(--line)]">
+            <a
+              href="#how-it-works"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="py-2.5 border-b border-[var(--line)] hover:text-[var(--blue)]"
+            >
               How it works
-            </Link>
-            <Link href="/faq" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b border-[var(--line)]">
+            </a>
+            <a
+              href="#services"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="py-2.5 border-b border-[var(--line)] hover:text-[var(--blue)]"
+            >
+              Services
+            </a>
+            <a
+              href="#partners"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                if (onOpenPartner) onOpenPartner();
+                else document.getElementById('partners')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="py-2.5 border-b border-[var(--line)] hover:text-[var(--blue)]"
+            >
+              For Cooks
+            </a>
+            <a
+              href="#why-us"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                document.getElementById('why-us')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="py-2.5 border-b border-[var(--line)] hover:text-[var(--blue)]"
+            >
+              About
+            </a>
+            <a
+              href="#faqs"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                document.getElementById('faqs')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="py-2.5 border-b border-[var(--line)] hover:text-[var(--blue)]"
+            >
               FAQs
-            </Link>
-            <div className="py-2 border-b border-[var(--line)]">
-              <span className="text-xs uppercase tracking-wider text-[var(--text-faint)] font-bold block mb-1">
-                Popular Services
-              </span>
-              <div className="grid grid-cols-2 gap-1 text-xs">
-                {SERVICES_MENU.map((s) => (
-                  <Link
-                    key={s.slug}
-                    href={`/services/${s.slug}`}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="p-1.5 rounded hover:text-[var(--blue)]"
+            </a>
+
+            <div className="pt-2 pb-1 flex flex-col gap-2">
+              {!isAuthenticated ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      handleLogin();
+                    }}
+                    className="btn btn-ghost btn-small text-center text-xs"
                   >
-                    {s.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-            <div className="py-2 border-b border-[var(--line)]">
-              <span className="text-xs uppercase tracking-wider text-[var(--text-faint)] font-bold block mb-1">
-                Cities
-              </span>
-              <div className="grid grid-cols-2 gap-1 text-xs">
-                {CITIES_MENU.map((c) => (
-                  <Link
-                    key={c.slug}
-                    href={`/cooks/${c.slug}`}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="p-1.5 rounded hover:text-[var(--blue)]"
+                    Login
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      if (onOpenPartner) onOpenPartner();
+                      else window.location.href = '/partner/signup';
+                    }}
+                    className="btn btn-ghost btn-small text-center text-xs"
                   >
-                    {c.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-            <div className="pt-2 flex flex-col gap-2">
-              <Link href="/book" onClick={() => setMobileMenuOpen(false)} className="btn btn-primary btn-small text-center">
-                Book a cook
-              </Link>
+                    Join as Cook
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  href={user?.role === 'cook' ? '/partner/dashboard' : '/customer/dashboard'}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="btn btn-ghost btn-small text-center w-full"
+                >
+                  Dashboard
+                </Link>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleBooking();
+                }}
+                className="btn btn-primary btn-small text-center w-full mt-1"
+              >
+                Book a cook now <span className="arrow">→</span>
+              </button>
             </div>
           </div>
         </div>

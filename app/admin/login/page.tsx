@@ -10,24 +10,9 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [bootstrapAvailable, setBootstrapAvailable] = useState(false);
-  const [bootstrapSuccess, setBootstrapSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Check if system bootstrap is available (no super admin exists yet)
-    async function checkBootstrapStatus() {
-      try {
-        const res = await fetch('/api/admin/bootstrap');
-        const json = await res.json();
-        if (json.success && json.data?.bootstrapAvailable) {
-          setBootstrapAvailable(true);
-        }
-      } catch {
-        // Ignore errors
-      }
-    }
-    checkBootstrapStatus();
-  }, []);
+
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,66 +85,7 @@ export default function AdminLoginPage() {
     }
   };
 
-  const handleBootstrap = async () => {
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      const res = await fetch('/api/admin/bootstrap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email, password }),
-      });
-
-      let json: any = null;
-      try {
-        json = await res.json();
-      } catch {
-        json = null;
-      }
-
-      if (!res.ok || !json || !json.success) {
-        const errorMsg =
-          typeof json?.error === 'string'
-            ? json.error
-            : json?.error?.message || 'Bootstrap initialization failed';
-        throw new Error(errorMsg);
-      }
-
-      // Verify the bootstrap admin session via /api/admin/me before navigating
-      const verifyRes = await fetch('/api/admin/me', {
-        credentials: 'include',
-      });
-      let verifyJson: any = null;
-      try {
-        verifyJson = await verifyRes.json();
-      } catch {
-        verifyJson = null;
-      }
-
-      if (!verifyRes.ok || !verifyJson || !verifyJson.success) {
-        const verifyError =
-          typeof verifyJson?.error === 'string'
-            ? verifyJson.error
-            : verifyJson?.error?.message ||
-              'Super admin was created, but session could not be verified. Please log in with your credentials.';
-        throw new Error(verifyError);
-      }
-
-      setBootstrapSuccess('Super Admin bootstrapped successfully! Navigating to dashboard...');
-      setBootstrapAvailable(false);
-
-      setTimeout(() => {
-        router.replace('/admin');
-        router.refresh();
-      }, 800);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Bootstrap failed.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 font-sans relative overflow-hidden">
@@ -175,35 +101,6 @@ export default function AdminLoginPage() {
           <h1 className="text-2xl font-bold text-white tracking-tight">Tizl Ops Portal</h1>
           <p className="text-xs text-slate-400 mt-1">Private Administrative Operations Center</p>
         </div>
-
-        {/* Bootstrap First-Time Setup Notification */}
-        {bootstrapAvailable && (
-          <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-xs space-y-2">
-            <div className="flex items-center gap-2 font-semibold text-amber-400 text-sm">
-              <Sparkles className="w-4 h-4 shrink-0" />
-              <span>First-Time Setup Detected</span>
-            </div>
-            <p>
-              No Super Admin exists in the system yet. Enter your credentials and click below to initialize your account as Super Admin.
-            </p>
-            <button
-              type="button"
-              onClick={handleBootstrap}
-              disabled={isLoading || !email || !password}
-              className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2 text-xs shadow-sm disabled:opacity-50"
-            >
-              <span>Initialize First Super Admin</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
-        {bootstrapSuccess && (
-          <div className="mb-6 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-300 text-xs flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>{bootstrapSuccess}</span>
-          </div>
-        )}
 
         {error && (
           <div className="mb-6 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300 text-xs flex items-start gap-2">
