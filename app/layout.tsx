@@ -34,8 +34,8 @@ export const metadata: Metadata = {
     siteName: 'Tizl',
     images: [
       {
-        url: '/tizl-logo.png',
-        width: 800,
+        url: '/assets/hero-cook.png',
+        width: 1200,
         height: 630,
         alt: 'Tizl — Book a Cook in 10 Minutes',
       },
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
     title: 'Tizl — Book a Cook in 10 Minutes',
     description:
       'Book a verified home cook in as little as 10 minutes. Tizl connects households with trusted cooks for breakfast, lunch, dinner, parties, and weekly meal services.',
-    images: ['/tizl-logo.png'],
+    images: ['/assets/hero-cook.png'],
   },
 };
 
