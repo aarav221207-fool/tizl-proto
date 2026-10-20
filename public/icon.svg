@@ -1,0 +1,10 @@
+<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Flame / Torch Top (Orange gradient glow) -->
+  <path d="M256 50 C230 90 270 130 236 170 C256 170 296 125 276 90 C270 76 296 62 256 50 Z" fill="#FA5225" />
+  <path d="M290 85 C260 120 295 155 270 190 C290 190 330 145 310 110 C305 100 325 90 290 85 Z" fill="#FF7A00" />
+  <!-- Torch Horizontal Bar -->
+  <rect x="90" y="190" width="332" height="72" rx="36" fill="#FA5225" />
+  <!-- Stem / Lower Arc of 'T' -->
+  <path d="M226 262 L226 390 C226 425 240 455 268 455 C295 455 285 410 285 390 L285 262 Z" fill="#FA5225" />
+  <rect x="226" y="260" width="58" height="195" rx="29" fill="#FA5225" />
+</svg>

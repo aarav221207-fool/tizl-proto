@@ -1,0 +1,35 @@
+# ==============================================================================
+# TIZL NETLIFY DEPLOYMENT CONFIGURATION
+# ==============================================================================
+# Configured for Next.js App Router on Netlify with Server Functions
+# Node.js: 22.x LTS (pinned via .nvmrc)
+# ==============================================================================
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22.23.3"
+  NPM_FLAGS = "--legacy-peer-deps=false"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Security & Cache Headers
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive, nosnippet"
+    Cache-Control = "no-store, max-age=0"
+
+[[headers]]
+  for = "/api/admin/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive, nosnippet"
+    Cache-Control = "no-store, max-age=0"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
