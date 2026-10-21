@@ -83,7 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,440..600;1,9..144,440..600&family=Inter:wght@400;500;600;700;800&display=swap"
           rel="stylesheet"
         />
-        <link rel="stylesheet" href="/tizl-design.css" />
+        <link rel="stylesheet" href="/tizl-design.css?v=3.0" />
         {/* Paytm Payment Gateway JS Checkout SDK (Environment-aware) */}
         <script type="application/javascript" src={paytmJsUrl} crossOrigin="anonymous" async />
         <script

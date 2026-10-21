@@ -128,8 +128,9 @@ export function SiteHeader({ onOpenBooking, onOpenAuth, onOpenPartner }: SiteHea
         </nav>
 
         {/* Header CTAs */}
-        <div className="header-ctas" id="headerCtas">
-          <div className="loc-picker">
+        {/* Header CTAs */}
+        <div className="header-ctas flex items-center gap-1.5 sm:gap-2.5" id="headerCtas">
+          <div className="loc-picker hidden sm:inline-flex">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 21s7-6.6 7-11.2A7 7 0 105 9.8C5 14.4 12 21 12 21z" />
               <circle cx="12" cy="9.6" r="2.3" />
@@ -141,39 +142,39 @@ export function SiteHeader({ onOpenBooking, onOpenAuth, onOpenPartner }: SiteHea
             <>
               <button
                 type="button"
-                className="btn btn-ghost btn-small"
+                className="btn btn-ghost btn-small text-xs sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 min-h-[36px] sm:min-h-[40px]"
                 onClick={handleLogin}
               >
                 Login
               </button>
               <button
                 type="button"
-                className="btn btn-primary btn-small"
+                className="btn btn-primary btn-small text-xs sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 min-h-[36px] sm:min-h-[40px] whitespace-nowrap"
                 onClick={handleBooking}
               >
-                Book a Cook <span className="arrow">→</span>
+                Book a Cook <span className="arrow hidden sm:inline">→</span>
               </button>
             </>
           )}
 
           {isAuthenticated && user?.role === 'customer' && (
             <>
-              <Link href="/customer/dashboard" className="header-user">
-                <div className="av">{(user.fullName || user.email || 'U').charAt(0).toUpperCase()}</div>
-                <span className="hidden sm:inline font-semibold text-[var(--ink)] text-sm">
+              <Link href="/customer/dashboard" className="header-user flex items-center gap-1.5 p-1 sm:p-2">
+                <div className="av w-7 h-7 sm:w-8 sm:h-8 text-xs">{(user.fullName || user.email || 'U').charAt(0).toUpperCase()}</div>
+                <span className="hidden min-[380px]:inline max-w-[60px] sm:max-w-[120px] truncate font-semibold text-[var(--ink)] text-xs sm:text-sm">
                   {user.fullName?.split(' ')[0] || user.email?.split('@')[0]}
                 </span>
               </Link>
               <button
                 type="button"
-                className="btn btn-primary btn-small"
+                className="btn btn-primary btn-small text-xs sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 min-h-[36px] sm:min-h-[40px] whitespace-nowrap"
                 onClick={handleBooking}
               >
-                Book a Cook <span className="arrow">→</span>
+                Book a Cook
               </button>
               <button
                 type="button"
-                className="btn btn-ghost btn-small text-xs px-2.5 py-1.5"
+                className="btn btn-ghost btn-small text-xs px-2 py-1.5 hidden sm:inline-flex"
                 onClick={() => logout()}
               >
                 Logout
@@ -183,15 +184,15 @@ export function SiteHeader({ onOpenBooking, onOpenAuth, onOpenPartner }: SiteHea
 
           {isAuthenticated && user?.role === 'cook' && (
             <>
-              <Link href="/partner/dashboard" className="header-user">
-                <div className="av">{(user.fullName || 'P').charAt(0).toUpperCase()}</div>
-                <span className="hidden sm:inline font-semibold text-[var(--ink)] text-sm">
+              <Link href="/partner/dashboard" className="header-user flex items-center gap-1.5 p-1 sm:p-2">
+                <div className="av w-7 h-7 sm:w-8 sm:h-8 text-xs">{(user.fullName || 'P').charAt(0).toUpperCase()}</div>
+                <span className="hidden min-[380px]:inline max-w-[60px] sm:max-w-[120px] truncate font-semibold text-[var(--ink)] text-xs sm:text-sm">
                   {user.fullName?.split(' ')[0] || 'Partner'}
                 </span>
               </Link>
               <button
                 type="button"
-                className="btn btn-ghost btn-small text-xs px-2.5 py-1.5"
+                className="btn btn-ghost btn-small text-xs px-2 py-1.5 hidden sm:inline-flex"
                 onClick={() => logout()}
               >
                 Logout
@@ -202,14 +203,14 @@ export function SiteHeader({ onOpenBooking, onOpenAuth, onOpenPartner }: SiteHea
           {/* Mobile hamburger toggle */}
           <button
             type="button"
-            className="md:hidden flex flex-col justify-center items-center w-9 h-9 rounded-lg border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] p-1.5 ml-1 transition-colors hover:bg-white"
+            className="md:hidden flex flex-col justify-center items-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] p-1 ml-0.5 transition-colors hover:bg-white"
             aria-label="Toggle menu"
             aria-expanded={mobileMenuOpen}
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
-            <span className={`w-4 h-0.5 bg-[var(--ink)] transition-transform duration-200 ${mobileMenuOpen ? 'rotate-45 translate-y-1' : 'my-0.5'}`} />
-            <span className={`w-4 h-0.5 bg-[var(--ink)] transition-opacity duration-200 ${mobileMenuOpen ? 'opacity-0' : 'my-0.5'}`} />
-            <span className={`w-4 h-0.5 bg-[var(--ink)] transition-transform duration-200 ${mobileMenuOpen ? '-rotate-45 -translate-y-1' : 'my-0.5'}`} />
+            <span className={`w-3.5 sm:w-4 h-0.5 bg-[var(--ink)] transition-transform duration-200 ${mobileMenuOpen ? 'rotate-45 translate-y-1' : 'my-0.5'}`} />
+            <span className={`w-3.5 sm:w-4 h-0.5 bg-[var(--ink)] transition-opacity duration-200 ${mobileMenuOpen ? 'opacity-0' : 'my-0.5'}`} />
+            <span className={`w-3.5 sm:w-4 h-0.5 bg-[var(--ink)] transition-transform duration-200 ${mobileMenuOpen ? '-rotate-45 -translate-y-1' : 'my-0.5'}`} />
           </button>
         </div>
       </div>

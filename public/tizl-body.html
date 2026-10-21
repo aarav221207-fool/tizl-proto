@@ -1,9 +1,9 @@
 
 
-<header class="site-header">
+<header class="site-header" id="siteHeader">
   <div class="wrap">
-    <div class="logo" onclick="showScreen('site');window.scrollTo({top:0,behavior:'smooth'});"><img src="/assets/tizl-header-logo.png" alt="Tizl" class="header-brand-logo-img" style="height:44px;width:auto;object-fit:contain;display:block;"></div>
-    <nav class="main-nav">
+    <div class="logo" onclick="showScreen('site');window.scrollTo({top:0,behavior:'smooth'});" role="button" tabindex="0" aria-label="Tizl Home"><img src="/assets/tizl-header-logo.png" alt="Tizl" class="header-brand-logo-img" style="height:44px;width:auto;object-fit:contain;display:block;"></div>
+    <nav class="main-nav" aria-label="Main Navigation">
       <div class="nav-item active"><a href="#" onclick="showScreen('site');window.scrollTo({top:0,behavior:'smooth'});return false;">Home</a></div>
       <div class="nav-item"><a href="#" onclick="showScreen('site');scrollToId('how-it-works');return false;">How it works</a></div>
       <div class="nav-item"><a href="#" onclick="showScreen('site');scrollToId('services');return false;">Services</a></div>
@@ -13,8 +13,27 @@
     </nav>
     <div class="header-ctas" id="headerCtas">
       <div class="loc-picker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.6 7-11.2A7 7 0 105 9.8C5 14.4 12 21 12 21z"/><circle cx="12" cy="9.6" r="2.3"/></svg>Delhi NCR <span style="font-size:10px;">▾</span></div>
-      <button class="btn btn-ghost btn-small" onclick="openAuthGate()">Login</button>
-      <button class="btn btn-primary btn-small" onclick="openBooking()">Book a Cook <span class="arrow">→</span></button>
+      <button class="btn btn-ghost btn-small" onclick="openAuthGate()" aria-label="Login">Login</button>
+      <button class="btn btn-primary btn-small" onclick="openBooking()" aria-label="Book a Cook">Book a Cook <span class="arrow">→</span></button>
+      <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()" aria-label="Toggle navigation menu" aria-expanded="false">
+        <span class="bar bar-1"></span>
+        <span class="bar bar-2"></span>
+        <span class="bar bar-3"></span>
+      </button>
+    </div>
+  </div>
+  <div class="mobile-nav-drawer" id="mobileNavDrawer" aria-hidden="true">
+    <div class="mobile-nav-links">
+      <a href="#" onclick="toggleMobileMenu(false);showScreen('site');window.scrollTo({top:0,behavior:'smooth'});return false;">Home</a>
+      <a href="#" onclick="toggleMobileMenu(false);showScreen('site');scrollToId('how-it-works');return false;">How it works</a>
+      <a href="#" onclick="toggleMobileMenu(false);showScreen('site');scrollToId('services');return false;">Services</a>
+      <a href="#" onclick="toggleMobileMenu(false);showScreen('site');scrollToId('partners');return false;">For Cooks</a>
+      <a href="#" onclick="toggleMobileMenu(false);showScreen('site');scrollToId('why-us');return false;">About</a>
+      <a href="#" onclick="toggleMobileMenu(false);showScreen('site');scrollToId('faqs');return false;">FAQs</a>
+      <div class="mobile-drawer-ctas">
+        <button class="btn btn-ghost btn-small" onclick="toggleMobileMenu(false);openAuthGate();">Login</button>
+        <button class="btn btn-primary btn-small" onclick="toggleMobileMenu(false);openBooking();">Book a Cook →</button>
+      </div>
     </div>
   </div>
 </header>
@@ -204,13 +223,93 @@
         <div class="faq-list" id="faqList"></div>
       </div>
       <div class="app-card reveal">
-        <h2>Book faster from the Tizl app.</h2>
-        <p>Track your cook live, manage bookings and pay in one tap.</p>
-        <div class="store-badges">
-          <div class="store-badge"><span>▶</span><div class="txt"><small>GET IT ON</small><strong>Google Play</strong></div></div>
-          <div class="store-badge"><span></span><div class="txt"><small>Download on the</small><strong>App Store</strong></div></div>
+        <div class="app-card-content">
+          <h2>Book faster from the Tizl app.</h2>
+          <p>Track your cook live, manage bookings, and enjoy home food on demand.</p>
+          <div class="store-badges">
+            <div class="store-badge"><span>▶</span><div class="txt"><small>GET IT ON</small><strong>Google Play</strong></div></div>
+            <div class="store-badge"><span></span><div class="txt"><small>Download on the</small><strong>App Store</strong></div></div>
+          </div>
+          <div class="phone-step-pills" role="tablist" aria-label="Booking demo steps">
+            <button class="phone-step-pill active" onclick="switchPhoneStep(0)" role="tab" aria-selected="true" aria-controls="phoneScreen0"><span class="step-num">1</span> Choose</button>
+            <button class="phone-step-pill" onclick="switchPhoneStep(1)" role="tab" aria-selected="false" aria-controls="phoneScreen1"><span class="step-num">2</span> Match</button>
+            <button class="phone-step-pill" onclick="switchPhoneStep(2)" role="tab" aria-selected="false" aria-controls="phoneScreen2"><span class="step-num">3</span> Track</button>
+            <button class="phone-step-pill" onclick="switchPhoneStep(3)" role="tab" aria-selected="false" aria-controls="phoneScreen3"><span class="step-num">4</span> Enjoy</button>
+          </div>
         </div>
-        <img class="phone-mock" src="/assets/phone-mock.png" alt="Tizl mobile application preview" loading="lazy" style="display:block;">
+
+        <div class="phone-mockup-wrapper" id="phoneMockupWrap" aria-label="Interactive Tizl App Demo">
+          <div class="phone-device-frame">
+            <div class="phone-notch"><span class="notch-camera"></span></div>
+            <div class="phone-status-bar">
+              <span class="status-time">9:41</span>
+              <div class="status-icons">
+                <svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M1 12.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5zm4-3a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5zm4-3a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5zm4-3a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5z"/></svg>
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><rect x="1" y="4" width="12" height="8" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="2.5" y="5.5" width="8" height="5" rx="1"/><path d="M14 6.5v3"/></svg>
+              </div>
+            </div>
+            <div class="phone-screen-viewport">
+              <!-- Step 1: Select Service -->
+              <div class="phone-screen active" id="phoneScreen0" role="tabpanel">
+                <div class="p-screen-head">
+                  <span class="p-brand">Tizl</span>
+                  <span class="p-loc-tag">📍 Sector 62</span>
+                </div>
+                <div class="p-card-mini">
+                  <span class="p-chip">Dinner · 4 People</span>
+                  <div class="p-title">Homestyle North Indian</div>
+                  <div class="p-items">Dal Makhani · Paneer Lababdar · Phulkas</div>
+                </div>
+                <div class="p-cta-btn" onclick="switchPhoneStep(1)" role="button" tabindex="0" style="cursor:pointer;" title="Click to match nearby cook">Book Instant Cook →</div>
+              </div>
+
+              <!-- Step 2: Cook Matching -->
+              <div class="phone-screen" id="phoneScreen1" role="tabpanel" aria-hidden="true" onclick="switchPhoneStep(2)" role="button" tabindex="0" style="cursor:pointer;" title="Click to view matched cook details">
+                <div class="p-match-radar">
+                  <div class="p-radar-ring"></div>
+                  <div class="p-radar-ring ring-2"></div>
+                  <div class="p-radar-pin">🍳</div>
+                </div>
+                <div class="p-match-text">
+                  <strong>Matching verified cook</strong>
+                  <span>3 cooks available nearby</span>
+                  <span class="p-eta-pill">⚡ Expected: 10 mins</span>
+                </div>
+              </div>
+
+              <!-- Step 3: Cook Details & En Route -->
+              <div class="phone-screen" id="phoneScreen2" role="tabpanel" aria-hidden="true">
+                <div class="p-cook-card">
+                  <div class="p-cook-row">
+                    <img src="/assets/avatar-priya-sharma.png" alt="Cook Sunita" class="p-cook-av" width="38" height="38">
+                    <div>
+                      <div class="p-cook-name">Sunita S. <span class="p-verified">✓</span></div>
+                      <div class="p-cook-meta">★ 4.9 · 180+ meals</div>
+                    </div>
+                  </div>
+                  <div class="p-track-status">
+                    <span class="p-pulse-dot"></span> 8 mins away · En route
+                  </div>
+                </div>
+                <div class="p-call-btn" onclick="switchPhoneStep(3)" role="button" tabindex="0" style="cursor:pointer;" title="Click to see arrival & start code">Track Cook on Live Map →</div>
+              </div>
+
+              <!-- Step 4: Booking Confirmed & Ready -->
+              <div class="phone-screen" id="phoneScreen3" role="tabpanel" aria-hidden="true">
+                <div class="p-done-badge">✓ Cook Arrived</div>
+                <div class="p-otp-box">
+                  <small>START CODE</small>
+                  <strong>4 8 2 1</strong>
+                </div>
+                <div class="p-confirmed-msg">
+                  <span>Cooking underway in your kitchen</span>
+                  <small class="p-pay-hint">Pay ₹450 after meal</small>
+                </div>
+                <div class="p-cta-btn" onclick="switchPhoneStep(0)" role="button" tabindex="0" style="cursor:pointer;margin-top:8px;font-size:11px;padding:7px;background:rgba(43,76,126,0.1);color:#2B4C7E;border:1px solid rgba(43,76,126,0.2);" title="Click to restart demo sequence">↻ Restart Demo</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

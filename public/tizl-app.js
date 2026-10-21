@@ -336,15 +336,38 @@ function showScreen(name){
   const pw = document.getElementById('partWelcomeName'); if(pw) pw.textContent = session.partName ? ', '+session.partName : '';
   window.scrollTo({top:0,behavior:'smooth'});
 }
+function toggleMobileMenu(force){
+  const drawer = document.getElementById('mobileNavDrawer');
+  const btn = document.getElementById('mobileMenuBtn');
+  if(!drawer || !btn) return;
+  const isOpen = force !== undefined ? force : !drawer.classList.contains('open');
+  if(isOpen){
+    drawer.classList.add('open');
+    drawer.removeAttribute('aria-hidden');
+    btn.classList.add('active');
+    btn.setAttribute('aria-expanded', 'true');
+  } else {
+    drawer.classList.remove('open');
+    drawer.setAttribute('aria-hidden', 'true');
+    btn.classList.remove('active');
+    btn.setAttribute('aria-expanded', 'false');
+  }
+}
+
 function refreshHeader(){
   const el = document.getElementById('headerCtas');
+  if(!el) return;
   const loc = `<div class="loc-picker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.6 7-11.2A7 7 0 105 9.8C5 14.4 12 21 12 21z"/><circle cx="12" cy="9.6" r="2.3"/></svg>Delhi NCR <span style="font-size:10px;">▾</span></div>`;
+  const hamburger = `<button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()" aria-label="Toggle navigation menu" aria-expanded="false"><span class="bar bar-1"></span><span class="bar bar-2"></span><span class="bar bar-3"></span></button>`;
+
   if(session.loggedInCustomer){
-    el.innerHTML = loc + `<div class="header-user" style="cursor:pointer;" onclick="showScreen('customer')"><div class="av">${(session.custName||'U')[0]}</div>${session.custName||'Account'}</div><button class="btn btn-primary btn-small" onclick="openBooking()">Book a Cook</button>`;
+    const shortName = (session.custName || 'Account').split(' ')[0];
+    el.innerHTML = loc + `<div class="header-user" style="cursor:pointer;" onclick="showScreen('customer')"><div class="av">${(session.custName||'U')[0]}</div><span class="user-name-text">${shortName}</span></div><button class="btn btn-primary btn-small" onclick="openBooking()">Book a Cook</button>` + hamburger;
   } else if(session.loggedInPartner){
-    el.innerHTML = loc + `<div class="header-user" style="cursor:pointer;" onclick="showScreen('partner')"><div class="av">${(session.partName||'P')[0]}</div>${session.partName||'Partner'}</div><button class="btn btn-ghost btn-small" onclick="logout()">Logout</button>`;
+    const shortName = (session.partName || 'Partner').split(' ')[0];
+    el.innerHTML = loc + `<div class="header-user" style="cursor:pointer;" onclick="showScreen('partner')"><div class="av">${(session.partName||'P')[0]}</div><span class="user-name-text">${shortName}</span></div><button class="btn btn-ghost btn-small" onclick="logout()">Logout</button>` + hamburger;
   } else {
-    el.innerHTML = loc + `<button class="btn btn-ghost btn-small" onclick="openAuthGate()">Login</button><button class="btn btn-primary btn-small" onclick="openBooking()">Book a Cook</button>`;
+    el.innerHTML = loc + `<button class="btn btn-ghost btn-small" onclick="openAuthGate()" aria-label="Login">Login</button><button class="btn btn-primary btn-small" onclick="openBooking()" aria-label="Book a Cook">Book a Cook <span class="arrow">→</span></button>` + hamburger;
   }
 }
 function logout(){ session.loggedInCustomer=false; session.loggedInPartner=false; refreshHeader(); showScreen('site'); }
@@ -1008,8 +1031,89 @@ function partnerBack(){ pStep = Math.max(0,pStep-1); renderPartnerStep(); replay
   }
 })();
 
+/* ============ INTERACTIVE PHONE DEMO CAROUSEL ============ */
+let currentPhoneStep = 0;
+let phoneTimer = null;
+let isPhonePaused = false;
+
+function switchPhoneStep(index) {
+  currentPhoneStep = index;
+  const screens = document.querySelectorAll('.phone-screen');
+  const pills = document.querySelectorAll('.phone-step-pill');
+  if(!screens.length) return;
+  screens.forEach((s, i) => {
+    if(i === index) {
+      s.classList.add('active');
+      s.removeAttribute('aria-hidden');
+    } else {
+      s.classList.remove('active');
+      s.setAttribute('aria-hidden', 'true');
+    }
+  });
+  pills.forEach((p, i) => {
+    if(i === index) {
+      p.classList.add('active');
+      p.setAttribute('aria-selected', 'true');
+    } else {
+      p.classList.remove('active');
+      p.setAttribute('aria-selected', 'false');
+    }
+  });
+
+  // Reset timer on user interaction so manual interaction gets full 4s view time
+  const isReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (phoneTimer && !isReduced) {
+    clearInterval(phoneTimer);
+    phoneTimer = setInterval(() => {
+      if (isPhonePaused) return;
+      currentPhoneStep = (currentPhoneStep + 1) % 4;
+      switchPhoneStep(currentPhoneStep);
+    }, 4000);
+  }
+}
+
+function initPhoneCarousel() {
+  const wrap = document.getElementById('phoneMockupWrap');
+  if (!wrap) return;
+
+  const isReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  
+  // Desktop hover and focus
+  wrap.addEventListener('mouseenter', () => { isPhonePaused = true; });
+  wrap.addEventListener('mouseleave', () => { isPhonePaused = false; });
+  wrap.addEventListener('focusin', () => { isPhonePaused = true; });
+  wrap.addEventListener('focusout', () => { isPhonePaused = false; });
+
+  // Mobile touch interaction
+  wrap.addEventListener('touchstart', () => { isPhonePaused = true; }, { passive: true });
+  wrap.addEventListener('touchend', () => { isPhonePaused = false; }, { passive: true });
+
+  // Page visibility awareness
+  document.addEventListener('visibilitychange', () => {
+    isPhonePaused = document.hidden;
+  });
+
+  if (isReduced) return;
+
+  if (phoneTimer) clearInterval(phoneTimer);
+  phoneTimer = setInterval(() => {
+    if (isPhonePaused) return;
+    currentPhoneStep = (currentPhoneStep + 1) % 4;
+    switchPhoneStep(currentPhoneStep);
+  }, 4000);
+}
+
+// Window unmount cleanup
+window.__cleanupTizlPhone = function() {
+  if (phoneTimer) {
+    clearInterval(phoneTimer);
+    phoneTimer = null;
+  }
+};
+
 /* init */
 setTimeout(initLiveStripMap, 100);
+setTimeout(initPhoneCarousel, 120);
 refreshHeader();
 renderCustBookings();
 renderJobs();

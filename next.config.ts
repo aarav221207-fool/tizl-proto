@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
   images: {
+    formats: ['image/avif', 'image/webp'],
+    deviceSizes: [320, 360, 375, 420, 768, 1024, 1200, 1600],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    minimumCacheTTL: 86400,
     remotePatterns: [
       {
         protocol: 'https',
@@ -34,6 +38,30 @@ const nextConfig: NextConfig = {
         headers: [
           { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive, nosnippet' },
           { key: 'Cache-Control', value: 'no-store, max-age=0' },
+        ],
+      },
+      {
+        source: '/assets/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
+      {
+        source: '/tizl-body.html',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
+        ],
+      },
+      {
+        source: '/tizl-app.js',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
+        ],
+      },
+      {
+        source: '/tizl-design.css',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
         ],
       },
     ];

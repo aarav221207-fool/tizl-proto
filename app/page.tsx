@@ -7,23 +7,37 @@ export default function HomePage() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Fetch and hydrate body HTML from static asset
-    fetch('/tizl-body.html')
+    let active = true;
+    let appendedScript: HTMLScriptElement | null = null;
+
+    // Fetch and hydrate body HTML from static asset with cache buster
+    fetch('/tizl-body.html?v=3.0')
       .then((res) => res.text())
       .then((html) => {
-        if (containerRef.current) {
+        if (active && containerRef.current) {
           containerRef.current.innerHTML = html;
 
           // Dynamically load tizl-app.js once HTML is mounted
           const script = document.createElement('script');
-          script.src = '/tizl-app.js';
+          script.src = '/tizl-app.js?v=3.0';
           script.async = true;
           document.body.appendChild(script);
+          appendedScript = script;
         }
       })
       .catch((err) => {
         console.error('Failed to load Tizl landing page:', err);
       });
+
+    return () => {
+      active = false;
+      if (typeof window !== 'undefined' && typeof (window as any).__cleanupTizlPhone === 'function') {
+        (window as any).__cleanupTizlPhone();
+      }
+      if (appendedScript && appendedScript.parentNode) {
+        appendedScript.parentNode.removeChild(appendedScript);
+      }
+    };
   }, []);
 
   return (
